@@ -1,4 +1,6 @@
-﻿const state = {
+﻿const STORAGE_KEY = "caua_financas_v1";
+
+const state = {
   atualizadoEm: "08/05/2026 09:25",
   caixa: [
     { local: "Banco Santander", valor: 419.22 },
@@ -27,6 +29,7 @@
     { item: "iFood", valor: 8.89, tipo: "Pessoal" },
     { item: "Gasolina", valor: 70.0, tipo: "Operacional" }
   ],
+  movimentacoes: [],
   limitePessoal: 129,
   regras: [
     "Gasolina separada: nao entra no limite pessoal de R$ 129,00.",
@@ -39,8 +42,27 @@
 const brl = (v) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const sum = (arr) => arr.reduce((acc, x) => acc + x, 0);
 
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved.movimentacoes)) state.movimentacoes = saved.movimentacoes;
+  } catch (_) {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ movimentacoes: state.movimentacoes }));
+}
+
 function compute() {
-  const caixaTotal = sum(state.caixa.map((x) => x.valor));
+  const caixaBase = sum(state.caixa.map((x) => x.valor));
+  const entradas = sum(state.movimentacoes.filter((m) => m.tipo === "Entrada").map((m) => m.valor));
+  const gastosLancados = sum(state.movimentacoes.filter((m) => m.tipo === "Gasto").map((m) => m.valor));
+  const caixaTotal = caixaBase + entradas - gastosLancados;
+
   const contasTotal = sum(state.contas.map((x) => x.valor));
   const deficit = contasTotal - caixaTotal;
 
@@ -48,7 +70,6 @@ function compute() {
     const total = m.uber + m.n99;
     return { ...m, total, diferenca: total - state.metaDia };
   });
-  const saldoCiclo = metaRows[0].diferenca;
 
   const gastosPessoais = state.gastos.filter((g) => g.tipo === "Pessoal");
   const totalPessoal = sum(gastosPessoais.map((g) => g.valor));
@@ -60,11 +81,14 @@ function compute() {
   const faltaPct = (deficit / contasTotal) * 100;
 
   return {
+    caixaBase,
+    entradas,
+    gastosLancados,
     caixaTotal,
     contasTotal,
     deficit,
     metaRows,
-    saldoCiclo,
+    saldoCiclo: metaRows[0].diferenca,
     totalPessoal,
     combustivel,
     usoLimite,
@@ -78,6 +102,20 @@ function compute() {
 function renderDashboard(c) {
   const el = document.getElementById("dashboard");
   el.innerHTML = `
+    <section class="table-wrap">
+      <h2>Lancar Entrada / Gasto</h2>
+      <form id="mov-form" class="form-grid">
+        <select name="tipo" required>
+          <option value="Entrada">Entrada</option>
+          <option value="Gasto">Gasto</option>
+        </select>
+        <input name="descricao" required placeholder="Descricao" maxlength="60" />
+        <input name="valor" type="number" min="0.01" step="0.01" required placeholder="Valor" />
+        <button type="submit">Adicionar</button>
+      </form>
+      <p class="hint">Isso altera o caixa automaticamente e fica salvo neste navegador.</p>
+    </section>
+
     <div class="grid">
       <article class="card"><h3>Caixa Real Hoje</h3><div class="value">${brl(c.caixaTotal)}</div></article>
       <article class="card"><h3>Contas a Pagar</h3><div class="value">${brl(c.contasTotal)}</div></article>
@@ -85,55 +123,59 @@ function renderDashboard(c) {
       <article class="card"><h3>Meta por Dia</h3><div class="value">${brl(state.metaDia)}</div></article>
     </div>
 
+    <section class="table-wrap">
+      <h2>Movimentacoes Lancadas</h2>
+      <table>
+        <thead><tr><th>Tipo</th><th>Descricao</th><th>Valor</th><th>Acao</th></tr></thead>
+        <tbody>
+          ${state.movimentacoes.length ? state.movimentacoes.map((m) => `
+            <tr>
+              <td>${m.tipo}</td>
+              <td>${m.descricao}</td>
+              <td>${m.tipo === "Entrada" ? "+" : "-"}${brl(m.valor)}</td>
+              <td><button class="btn-danger" data-remove-id="${m.id}">Remover</button></td>
+            </tr>
+          `).join("") : `<tr><td colspan="4">Sem lancamentos ainda.</td></tr>`}
+        </tbody>
+      </table>
+      <p><strong>Caixa base:</strong> ${brl(c.caixaBase)} | <strong>Entradas:</strong> +${brl(c.entradas)} | <strong>Gastos:</strong> -${brl(c.gastosLancados)}</p>
+    </section>
+
     <section class="progress">
       <h2>Projecao para 10/05/2026</h2>
       <div class="progress-row">
         <div class="progress-head"><span>Caixa Hoje</span><strong>${brl(c.caixaTotal)} (${c.caixaPct.toFixed(1)}%)</strong></div>
-        <div class="bar"><div class="fill" style="width:${c.caixaPct}%"></div></div>
+        <div class="bar"><div class="fill" style="width:${Math.max(0, Math.min(c.caixaPct, 100))}%"></div></div>
       </div>
       <div class="progress-row">
         <div class="progress-head"><span>Falta Juntar</span><strong>${brl(c.deficit)} (${c.faltaPct.toFixed(1)}%)</strong></div>
-        <div class="bar"><div class="fill warn" style="width:${c.faltaPct}%"></div></div>
+        <div class="bar"><div class="fill warn" style="width:${Math.max(0, Math.min(c.faltaPct, 100))}%"></div></div>
       </div>
-      <div class="progress-row">
-        <div class="progress-head"><span>Meta Total</span><strong>${brl(c.contasTotal)} (100%)</strong></div>
-        <div class="bar"><div class="fill danger" style="width:100%"></div></div>
-      </div>
-    </section>
-
-    <section class="table-wrap">
-      <h2>Status Meta Uber+99 (Meta: ${brl(state.metaDia)}/dia)</h2>
-      <table>
-        <thead><tr><th>Dia</th><th>Data</th><th>Uber</th><th>99</th><th>Total</th><th>Diferenca</th><th>Status</th></tr></thead>
-        <tbody>
-          ${c.metaRows.map((r) => `
-            <tr>
-              <td>${r.dia}</td>
-              <td>${r.data}</td>
-              <td>${brl(r.uber)}</td>
-              <td>${brl(r.n99)}</td>
-              <td>${brl(r.total)}</td>
-              <td>${r.diferenca >= 0 ? "+" : ""}${brl(r.diferenca)}</td>
-              <td>${badge(r.status)}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-      <p><strong>Saldo do ciclo:</strong> ${c.saldoCiclo >= 0 ? "+" : ""}${brl(c.saldoCiclo)}</p>
-    </section>
-
-    <section class="table-wrap">
-      <h2>Checklist Final</h2>
-      <ul class="checklist">
-        <li><input type="checkbox" /> Caixa ${brl(c.caixaTotal)} bate?</li>
-        <li><input type="checkbox" /> Contas ${brl(c.contasTotal)} sao essas?</li>
-        <li><input type="checkbox" /> Ontem ${brl(c.metaRows[0].total)} = Uber ${brl(c.metaRows[0].uber)} + 99 ${brl(c.metaRows[0].n99)} confere?</li>
-        <li><input type="checkbox" /> Hoje faltam ${brl(Math.abs(c.metaRows[1].diferenca))} pra meta ok?</li>
-        <li><input type="checkbox" /> Gastos pessoais ${brl(c.totalPessoal)} conferem?</li>
-        <li><input type="checkbox" /> Gasolina ${brl(c.combustivel)} separada ok?</li>
-      </ul>
     </section>
   `;
+
+  const form = document.getElementById("mov-form");
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const tipo = String(formData.get("tipo") || "Entrada");
+    const descricao = String(formData.get("descricao") || "").trim();
+    const valor = Number(formData.get("valor") || 0);
+    if (!descricao || !Number.isFinite(valor) || valor <= 0) return;
+
+    state.movimentacoes.unshift({ id: crypto.randomUUID(), tipo, descricao, valor });
+    saveState();
+    renderAll();
+  });
+
+  el.querySelectorAll("[data-remove-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-remove-id");
+      state.movimentacoes = state.movimentacoes.filter((m) => m.id !== id);
+      saveState();
+      renderAll();
+    });
+  });
 }
 
 function badge(status) {
@@ -145,21 +187,11 @@ function badge(status) {
 function renderPlanilha(c) {
   const el = document.getElementById("planilha");
   el.innerHTML = `
-    ${table("Caixa Real Hoje", ["Local", "Valor"], state.caixa.map((i) => [i.local, brl(i.valor)]), ["Total disponivel", brl(c.caixaTotal)])}
+    ${table("Caixa Real Hoje", ["Local", "Valor"], state.caixa.map((i) => [i.local, brl(i.valor)]), ["Total base", brl(c.caixaBase)])}
+    ${table("Ajuste por Movimentacoes", ["Item", "Valor"], [["Entradas", `+${brl(c.entradas)}`], ["Gastos", `-${brl(c.gastosLancados)}`], ["Caixa atual", brl(c.caixaTotal)]], null)}
     ${table("Contas a Pagar - Vencimento 10/05/2026", ["Despesa", "Vencimento", "Valor", "Prioridade", "Status"], state.contas.map((i) => [i.despesa, i.vencimento, brl(i.valor), i.prioridade, i.status]), ["Total", "", brl(c.contasTotal), "", ""]) }
     ${table("Meta Uber+99 - Ontem/Hoje/Amanha", ["Dia", "Data", "Uber", "99", "Total", "Diferenca", "Status"], c.metaRows.map((i) => [i.dia, i.data, brl(i.uber), brl(i.n99), brl(i.total), `${i.diferenca >= 0 ? "+" : ""}${brl(i.diferenca)}`, i.status]), null)}
     ${table("Controle de Gastos - Ciclo 01/05 a 10/05", ["Item", "Valor", "Tipo"], state.gastos.map((i) => [i.item, brl(i.valor), i.tipo]), ["Total ciclo", brl(c.totalCiclo), ""])}
-    <section class="table-wrap">
-      <h2>Resumo do Limite Pessoal</h2>
-      <table>
-        <tbody>
-          <tr><th>Total pessoal</th><td>${brl(c.totalPessoal)}</td></tr>
-          <tr><th>Limite pessoal</th><td>${brl(state.limitePessoal)}</td></tr>
-          <tr><th>Limite usado</th><td>${c.usoLimite.toFixed(1)}%</td></tr>
-          <tr><th>Ainda disponivel</th><td>${brl(c.aindaDisponivel)}</td></tr>
-        </tbody>
-      </table>
-    </section>
   `;
 }
 
@@ -172,7 +204,6 @@ function renderRegras() {
         ${state.regras.map((r) => `<li>${r}</li>`).join("")}
       </ul>
       <p><strong>Atualizacao:</strong> ${state.atualizadoEm}</p>
-      <p>Arquivos CSV em <code>dados/</code> prontos para abrir no Excel/Google Sheets.</p>
     </section>
   `;
 }
@@ -203,8 +234,13 @@ function setupTabs() {
   });
 }
 
-const computed = compute();
-renderDashboard(computed);
-renderPlanilha(computed);
-renderRegras();
+function renderAll() {
+  const computed = compute();
+  renderDashboard(computed);
+  renderPlanilha(computed);
+  renderRegras();
+}
+
+loadState();
+renderAll();
 setupTabs();
