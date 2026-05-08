@@ -160,14 +160,14 @@ button, a, [role="button"], .tab, .period-btn, .weekday-cell, .kpi {
   display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap;
 }
 .header-eyebrow {
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 0.78rem; font-weight: 700; letter-spacing: 0.32em; text-transform: uppercase;
   color: var(--neon-green); display: inline-block; margin-bottom: 6px;
   text-shadow: 0 0 12px rgba(74, 222, 128, 0.45);
 }
 .header h1 {
   margin: 0;
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: clamp(2rem, 3vw, 2.6rem); font-weight: 700;
   letter-spacing: 0.04em; color: var(--text-strong);
   text-transform: uppercase;
@@ -226,7 +226,7 @@ button, a, [role="button"], .tab, .period-btn, .weekday-cell, .kpi {
   gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
 }
 .panel-title {
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 1.05rem; font-weight: 700; margin: 0;
   letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-strong);
 }
@@ -255,7 +255,7 @@ button, a, [role="button"], .tab, .period-btn, .weekday-cell, .kpi {
 .kpi.info::before   { background: var(--neon-cyan);   box-shadow: 2px 0 12px rgba(94, 226, 255, 0.45); }
 .kpi h3 {
   margin: 0 0 6px;
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 0.7rem; font-weight: 700;
   color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em;
 }
@@ -313,6 +313,7 @@ select option { background: var(--surface); color: var(--text); }
 }
 .form-grid.cols-receber      { grid-template-columns: 1fr 110px 110px 130px 140px 120px 120px; }
 .form-grid.cols-conta-item   { grid-template-columns: 1fr 90px 90px 130px 110px 110px; }
+.form-grid.cols-conta-item.is-fixa { grid-template-columns: 1fr 130px 110px 110px; }
 .form-grid.cols-conta        { grid-template-columns: 1fr 140px 160px 70px 130px; }
 .form-grid.cols-categoria    { grid-template-columns: 1fr 140px 140px; }
 .form-grid.cols-caixa        { grid-template-columns: 1fr 160px 70px 130px; }
@@ -320,6 +321,17 @@ select option { background: var(--surface); color: var(--text); }
 .form-grid.cols-gasolina     { grid-template-columns: 160px 1fr 140px 130px; }
 
 .form-grid input, .form-grid select, .form-grid button { font: inherit; }
+
+.check-line {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 0.9rem; color: var(--text);
+  padding: 4px 0; cursor: pointer; user-select: none;
+}
+.check-line input[type="checkbox"] {
+  width: 18px; height: 18px; min-height: 18px; margin: 0;
+  accent-color: var(--neon-green); cursor: pointer;
+}
+.form-grid > .check-line.full { grid-column: 1 / -1; }
 
 .btn {
   background: linear-gradient(135deg, var(--green-deep), var(--neon-green));
@@ -349,7 +361,7 @@ select option { background: var(--surface); color: var(--text); }
 
 .hint { color: var(--muted); font-size: 0.86rem; margin: 8px 0 0; }
 .label {
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 0.72rem; font-weight: 700; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; display: block;
 }
@@ -371,7 +383,7 @@ th, td {
 }
 th {
   background: var(--surface-2); color: var(--muted); font-weight: 700;
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em;
 }
 tr:last-child td { border-bottom: none; }
@@ -379,7 +391,7 @@ tr.row-paid td { color: var(--muted-2); }
 tr.row-paid td:not(.actions) { text-decoration: line-through; text-decoration-color: var(--muted-2); }
 tr.section td {
   background: var(--surface-3);
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-weight: 700; color: var(--neon-green);
   font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.1em;
   padding: 8px 12px;
@@ -393,7 +405,7 @@ tbody tr:hover:not(.section) { background: var(--surface-2); }
 .badge {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 9px; border-radius: 999px;
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 0.68rem; font-weight: 700; line-height: 1.5;
   text-transform: uppercase; letter-spacing: 0.08em;
   white-space: nowrap;
@@ -414,6 +426,7 @@ tbody tr:hover:not(.section) { background: var(--surface-2); }
 }
 .pill.faltam  { background: var(--warn-soft); color: var(--neon-orange); font-weight: 700; border-color: rgba(255,154,60,0.4); }
 .pill.quitada { background: var(--ok-soft);   color: var(--neon-green);  font-weight: 700; border-color: rgba(74,222,128,0.4); }
+.pill.fixa    { background: var(--info-soft); color: var(--neon-cyan);   font-weight: 700; border-color: rgba(94,226,255,0.4); }
 
 /* PROGRESS */
 .progress {
@@ -503,6 +516,19 @@ tbody tr:hover:not(.section) { background: var(--surface-2); }
   .inline-input { font-size: 16px; padding: 9px 10px; min-height: 40px; }
 }
 
+/* Color swatch usado dentro de tabelas — tamanho fixo, não estica */
+.inline-input.cor-swatch {
+  width: 44px; min-width: 44px; height: 38px;
+  padding: 2px; flex: 0 0 44px;
+  border-radius: 8px;
+}
+@media (max-width: 600px) {
+  .inline-input.cor-swatch {
+    width: 52px; min-width: 52px; height: 44px; flex: 0 0 52px;
+    margin-left: auto;
+  }
+}
+
 /* CONTAS GRID — cards coloridos por conta */
 .contas-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
 .conta-card {
@@ -525,7 +551,7 @@ tbody tr:hover:not(.section) { background: var(--surface-2); }
 }
 .conta-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 1.05rem; }
 .conta-title strong {
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--text-strong); font-weight: 700;
 }
@@ -551,7 +577,7 @@ tbody tr:hover:not(.section) { background: var(--surface-2); }
   position: fixed;
   right: calc(14px + env(safe-area-inset-right));
   bottom: calc(12px + env(safe-area-inset-bottom));
-  font-family: "Cinzel", "Inter", serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 0.62rem;
   color: rgba(255, 255, 255, 0.18);
   letter-spacing: 0.18em; text-transform: uppercase;
@@ -757,7 +783,7 @@ tbody tr:hover:not(.section) { background: var(--surface-2); }
   .conta-itens td::before,
   .stacked-rows td::before {
     content: attr(data-label);
-    font-family: "Cinzel", "Inter", serif;
+    font-family: "Inter", "Segoe UI", sans-serif;
     font-size: 0.66rem; font-weight: 700;
     color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
     text-align: left;

@@ -22,32 +22,32 @@ const DEFAULT_STATE = {
       vencimento: "2026-05-10", prioridade: 1, status: "pendente",
       cor: "#a06a48",
       itens: [
-        { id: uid(), descricao: "Compra exemplo", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 331.24, valorPago: 0 }
+        { id: uid(), descricao: "Compra exemplo", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 331.24, valorPago: 0 }
       ]
     },
     {
       id: uid(), descricao: "Aluguel", grupo: "outras",
       vencimento: "2026-05-10", prioridade: 2, status: "pendente",
       cor: "#ff5564",
-      itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 500.0, valorPago: 0 }]
+      itens: [{ id: uid(), descricao: "Mensal", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 500.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Energia", grupo: "outras",
       vencimento: "2026-05-10", prioridade: 3, status: "pendente",
       cor: "#ff9a3c",
-      itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 125.0, valorPago: 0 }]
+      itens: [{ id: uid(), descricao: "Mensal", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 125.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Internet", grupo: "outras",
       vencimento: "2026-05-10", prioridade: 4, status: "pendente",
       cor: "#5ee2ff",
-      itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 31.0, valorPago: 0 }]
+      itens: [{ id: uid(), descricao: "Mensal", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 31.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Dentista", grupo: "outras",
       vencimento: "2026-05-15", prioridade: 5, status: "pendente",
       cor: "#4ade80",
-      itens: [{ id: uid(), descricao: "Sessão", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 75.0, valorPago: 0 }]
+      itens: [{ id: uid(), descricao: "Sessão", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 75.0, valorPago: 0 }]
     }
   ],
   categorias: [
@@ -221,6 +221,13 @@ function loadState() {
     state = { ...clone(DEFAULT_STATE), ...saved };
     state.config = { ...DEFAULT_STATE.config, ...(saved.config || {}) };
     state.reservaConfig = { ...DEFAULT_STATE.reservaConfig, ...(saved.reservaConfig || {}) };
+    state.contas = (state.contas || []).map((c) => ({
+      ...c,
+      itens: (c.itens || []).map((it) => ({
+        ...it,
+        fixa: typeof it.fixa === "boolean" ? it.fixa : (!it.parcelasTotal || it.parcelasTotal <= 1)
+      }))
+    }));
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -642,7 +649,7 @@ function renderContas(c) {
                 return `
                   <tr data-item="${it.id}" class="${itemPago ? "row-paid" : ""}">
                     <td data-label="Item">${escapeHtml(it.descricao || "Item")}</td>
-                    <td data-label="Parcela"><span class="pill">${it.parcelaAtual || 1}/${it.parcelasTotal || 1}</span></td>
+                    <td data-label="Parcela">${it.fixa ? `<span class="pill fixa" title="Conta fixa mensal">Mensal</span>` : `<span class="pill">${it.parcelaAtual || 1}/${it.parcelasTotal || 1}</span>`}</td>
                     <td class="num" data-label="Valor">${brl(it.valorParcela)}</td>
                     <td class="num muted" data-label="Total">${brl(totalItem)}</td>
                     <td class="num" data-label="Pago">${brl(it.valorPago || 0)}</td>
@@ -741,14 +748,18 @@ function renderContas(c) {
         <button class="btn ghost" id="cancel-item">Cancelar</button>
       </div>
       <form id="form-item" class="form-grid cols-conta-item">
-        <input name="descricao" placeholder="Item (ex: Tablet)" required maxlength="60" />
-        <input name="parcelaAtual" type="number" min="1" step="1" placeholder="Parc. atual" required />
-        <input name="parcelasTotal" type="number" min="1" step="1" placeholder="Parc. total" required />
+        <label class="check-line full">
+          <input type="checkbox" name="fixa" />
+          Conta fixa mensal (sem parcelas)
+        </label>
+        <input name="descricao" placeholder="Descrição (ex: Aluguel, Tablet)" required maxlength="60" />
+        <input name="parcelaAtual" type="number" min="1" step="1" placeholder="Parc. atual" data-parcela />
+        <input name="parcelasTotal" type="number" min="1" step="1" placeholder="Parc. total" data-parcela />
         <input name="valorParcela" type="number" min="0.01" step="0.01" placeholder="Valor parcela" required />
         <input name="valorPago" type="number" min="0" step="0.01" placeholder="Pago (parcial)" value="0" />
         <button class="btn" type="submit">Salvar item</button>
       </form>
-      <p class="hint">Ex: tablet 11/12 R$ 50 · total da dívida será R$ 600.</p>
+      <p class="hint">Marque <strong>fixa</strong> pra contas que repetem todo mês (aluguel, energia). Desmarque pra parcelas (ex: tablet 11/12 R$ 50).</p>
     </section>
   `;
 
@@ -836,14 +847,27 @@ function bindContas() {
   const titleItem = document.getElementById("form-item-title");
   let itemContext = null; // { contaId, itemId? }
 
+  const toggleFixa = () => {
+    const fixa = formItem.fixa.checked;
+    formItem.classList.toggle("is-fixa", fixa);
+    formItem.querySelectorAll("[data-parcela]").forEach((el) => {
+      el.style.display = fixa ? "none" : "";
+      el.required = !fixa;
+    });
+    formItem.valorParcela.placeholder = fixa ? "Valor mensal" : "Valor parcela";
+  };
+  formItem.fixa.addEventListener("change", toggleFixa);
+
   const showFormItem = (contaId, item) => {
     itemContext = { contaId, itemId: item?.id };
-    titleItem.textContent = item ? "Editar item" : "Novo item / parcela";
+    titleItem.textContent = item ? "Editar item" : "Novo item";
     formItem.descricao.value = item?.descricao || "";
+    formItem.fixa.checked = item ? !!item.fixa : true;
     formItem.parcelaAtual.value = item?.parcelaAtual || 1;
     formItem.parcelasTotal.value = item?.parcelasTotal || 1;
     formItem.valorParcela.value = item?.valorParcela || "";
     formItem.valorPago.value = item?.valorPago || 0;
+    toggleFixa();
     panelItem.style.display = "block";
     panelItem.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -854,10 +878,12 @@ function bindContas() {
     e.preventDefault();
     if (!itemContext) return;
     const fd = new FormData(formItem);
+    const fixa = !!fd.get("fixa");
     const data = {
       descricao: String(fd.get("descricao") || "").trim() || "Item",
-      parcelaAtual: Number(fd.get("parcelaAtual") || 1),
-      parcelasTotal: Number(fd.get("parcelasTotal") || 1),
+      fixa,
+      parcelaAtual: fixa ? 1 : Number(fd.get("parcelaAtual") || 1),
+      parcelasTotal: fixa ? 1 : Number(fd.get("parcelasTotal") || 1),
       valorParcela: Number(fd.get("valorParcela") || 0),
       valorPago: Number(fd.get("valorPago") || 0)
     };
@@ -980,26 +1006,21 @@ function renderCaixa(c) {
         <button class="btn" type="submit">Adicionar</button>
       </form>
 
-      <div class="table-wrap" style="margin-top:10px;">
+      <div class="table-wrap stacked-rows" style="margin-top:10px;">
         <table>
-          <thead><tr><th>Cor</th><th>Local</th><th>Saldo calculado</th><th>Base</th><th></th></tr></thead>
+          <thead><tr><th>Local</th><th>Cor</th><th>Saldo calculado</th><th>Base</th><th></th></tr></thead>
           <tbody>
             ${linhas.map((x) => `
               <tr data-id="${x.id}">
-                <td><input type="color" class="inline-input" data-field="cor" value="${x.cor || "#2f7d32"}" style="padding:2px;" /></td>
-                <td><input class="inline-input" data-field="local" value="${escapeAttr(x.local)}" /></td>
-                <td class="num"><strong style="color:${x.cor || "#2f7d32"};">${brl(x.saldoCalc)}</strong></td>
-                <td><input class="inline-input" data-field="valor" type="number" step="0.01" value="${x.base}" title="Valor base — saldo final = base + entradas − gastos" /></td>
+                <td data-label="Local"><input class="inline-input" data-field="local" value="${escapeAttr(x.local)}" /></td>
+                <td data-label="Cor"><input type="color" class="inline-input cor-swatch" data-field="cor" value="${x.cor || "#2f7d32"}" /></td>
+                <td class="num" data-label="Saldo"><strong style="color:${x.cor || "#2f7d32"};">${brl(x.saldoCalc)}</strong></td>
+                <td data-label="Base"><input class="inline-input" data-field="valor" type="number" step="0.01" value="${x.base}" title="Valor base — saldo final = base + entradas − gastos" /></td>
                 <td class="actions">
                   <button class="btn sm ghost" data-action="ajustar" title="Definir saldo final">Ajustar</button>
                   <button class="btn sm danger" data-action="remover">×</button>
                 </td>
               </tr>`).join("")}
-            <tr>
-              <td colspan="2"><strong>Total disponível</strong></td>
-              <td class="num"><strong>${brl(c.caixaTotal)}</strong></td>
-              <td colspan="2"></td>
-            </tr>
           </tbody>
         </table>
       </div>
