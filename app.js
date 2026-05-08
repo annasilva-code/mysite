@@ -641,12 +641,12 @@ function renderContas(c) {
                 const itemPago = abertoItem === 0;
                 return `
                   <tr data-item="${it.id}" class="${itemPago ? "row-paid" : ""}">
-                    <td>${escapeHtml(it.descricao || "Item")}</td>
-                    <td><span class="pill">${it.parcelaAtual || 1}/${it.parcelasTotal || 1}</span></td>
-                    <td class="num">${brl(it.valorParcela)}</td>
-                    <td class="num muted">${brl(totalItem)}</td>
-                    <td class="num">${brl(it.valorPago || 0)}</td>
-                    <td class="num"><strong class="${abertoItem > 0 ? "warn" : "ok"}">${brl(abertoItem)}</strong></td>
+                    <td data-label="Item">${escapeHtml(it.descricao || "Item")}</td>
+                    <td data-label="Parcela"><span class="pill">${it.parcelaAtual || 1}/${it.parcelasTotal || 1}</span></td>
+                    <td class="num" data-label="Valor">${brl(it.valorParcela)}</td>
+                    <td class="num muted" data-label="Total">${brl(totalItem)}</td>
+                    <td class="num" data-label="Pago">${brl(it.valorPago || 0)}</td>
+                    <td class="num" data-label="Falta"><strong class="${abertoItem > 0 ? "warn" : "ok"}">${brl(abertoItem)}</strong></td>
                     <td class="actions">
                       ${!itemPago ? `<button class="btn sm success" data-act="quit-item">Pagar</button>` : `<button class="btn sm ghost" data-act="reabrir-item">Reabrir</button>`}
                       <button class="btn sm ghost" data-act="parc-item">Parcial</button>
@@ -1014,16 +1014,16 @@ function renderCaixa(c) {
         <p class="panel-sub">Registros do tipo "Entrada" com a fonte que recebeu</p>
       </div>
       ${movEntradas.length === 0 ? `<p class="muted">Nenhuma entrada registrada ainda.</p>` : `
-      <div class="table-wrap">
+      <div class="table-wrap stacked-rows">
         <table>
           <thead><tr><th>Data</th><th>Descrição</th><th>Fonte</th><th>Valor</th><th></th></tr></thead>
           <tbody>
             ${movEntradas.map((m) => `
               <tr data-mov="${m.id}">
-                <td>${fmtBR(m.data)}</td>
-                <td>${escapeHtml(m.descricao)}</td>
-                <td><span class="pill" style="background:${fonteCor(m.fonteId)};color:#fff;">${escapeHtml(fonteNome(m.fonteId))}</span></td>
-                <td class="num ok">+${brl(m.valor)}</td>
+                <td data-label="Data">${fmtBR(m.data)}</td>
+                <td data-label="Descrição">${escapeHtml(m.descricao)}</td>
+                <td data-label="Fonte"><span class="pill" style="background:${fonteCor(m.fonteId)};color:#fff;">${escapeHtml(fonteNome(m.fonteId))}</span></td>
+                <td class="num ok" data-label="Valor">+${brl(m.valor)}</td>
                 <td class="actions"><button class="btn sm danger" data-action="rm-mov">×</button></td>
               </tr>`).join("")}
           </tbody>
@@ -1155,7 +1155,7 @@ function renderAReceber() {
       </form>
 
       ${lista.length === 0 ? `<p class="muted" style="margin-top:8px;">Nenhuma entrada parcelada cadastrada.</p>` : `
-      <div class="table-wrap" style="margin-top:10px;">
+      <div class="table-wrap stacked-rows" style="margin-top:10px;">
         <table>
           <thead><tr><th>De</th><th>Parcelas</th><th>Valor</th><th>Total dívida</th><th>Restante</th><th>Fonte</th><th></th></tr></thead>
           <tbody>
@@ -1165,15 +1165,15 @@ function renderAReceber() {
               const totalGeral = (r.parcelasTotal || 0) * (r.valorParcela || 0);
               return `
                 <tr data-receber="${r.id}">
-                  <td>
+                  <td data-label="De">
                     <span class="conta-dot" style="--conta-cor:${r.cor || "#3f51b5"};"></span>
                     <strong>${escapeHtml(r.descricao)}</strong>
                   </td>
-                  <td><span class="pill">${r.parcelasRecebidas || 0}/${r.parcelasTotal}</span> · faltam <strong>${rest}</strong></td>
-                  <td class="num">${brl(r.valorParcela)}</td>
-                  <td class="num muted">${brl(totalGeral)}</td>
-                  <td class="num"><strong class="${rest > 0 ? "warn" : "ok"}">${brl(totalRest)}</strong></td>
-                  <td><span class="pill" style="background:${fonteCor(r.fonteId)};color:#fff;">${escapeHtml(fonteNome(r.fonteId))}</span></td>
+                  <td data-label="Parcelas"><span class="pill">${r.parcelasRecebidas || 0}/${r.parcelasTotal}</span> · faltam <strong>${rest}</strong></td>
+                  <td class="num" data-label="Valor">${brl(r.valorParcela)}</td>
+                  <td class="num muted" data-label="Total">${brl(totalGeral)}</td>
+                  <td class="num" data-label="Restante"><strong class="${rest > 0 ? "warn" : "ok"}">${brl(totalRest)}</strong></td>
+                  <td data-label="Fonte"><span class="pill" style="background:${fonteCor(r.fonteId)};color:#fff;">${escapeHtml(fonteNome(r.fonteId))}</span></td>
                   <td class="actions">
                     <button class="btn sm success" data-act="receber">Recebi parcela</button>
                     <button class="btn sm ghost" data-act="edit-receber">Editar</button>
@@ -1353,7 +1353,7 @@ function renderGastos(c) {
     <section class="panel">
       <div class="panel-head"><h2 class="panel-title">Histórico de gastos</h2></div>
       ${todosGastos.length === 0 ? `<p class="muted">Sem gastos registrados.</p>` : `
-      <div class="table-wrap">
+      <div class="table-wrap stacked-rows">
         <table>
           <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
           <tbody>
@@ -1361,13 +1361,13 @@ function renderGastos(c) {
               const excluida = isCatExcluida(m.categoria);
               return `
               <tr data-mov="${m.id}">
-                <td>${fmtBR(m.data)}</td>
-                <td>
+                <td data-label="Data">${fmtBR(m.data)}</td>
+                <td data-label="Categoria">
                   <span class="pill" style="background:${corDaCategoria(m.categoria)};color:#fff;">${escapeHtml(m.categoria || "—")}</span>
                   ${excluida ? `<span class="pill" title="Não conta no limite">fora do limite</span>` : ""}
                 </td>
-                <td>${escapeHtml(m.descricao)}</td>
-                <td class="num neg">−${brl(m.valor)}</td>
+                <td data-label="Descrição">${escapeHtml(m.descricao)}</td>
+                <td class="num neg" data-label="Valor">−${brl(m.valor)}</td>
                 <td class="actions"><button class="btn sm danger" data-action="rm-mov">×</button></td>
               </tr>`;
             }).join("")}
@@ -1538,16 +1538,16 @@ function renderCombustivel() {
         <p class="panel-sub">Todos os abastecimentos — mais recente primeiro</p>
       </div>
       ${todos.length === 0 ? `<p class="muted">Nenhum registro ainda.</p>` : `
-      <div class="table-wrap">
+      <div class="table-wrap stacked-rows">
         <table>
           <thead><tr><th>Data</th><th>Semana</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
           <tbody>
             ${todos.slice().reverse().slice(0, 80).map((g) => `
               <tr data-id="${g.id}" data-fonte="${g.fonte}">
-                <td>${fmtBR(g.data)}</td>
-                <td><span class="pill">${isoWeekKey(parseISO(g.data))}</span></td>
-                <td>${escapeHtml(g.descricao || "—")}</td>
-                <td class="num">${brl(g.valor)}</td>
+                <td data-label="Data">${fmtBR(g.data)}</td>
+                <td data-label="Semana"><span class="pill">${isoWeekKey(parseISO(g.data))}</span></td>
+                <td data-label="Descrição">${escapeHtml(g.descricao || "—")}</td>
+                <td class="num" data-label="Valor">${brl(g.valor)}</td>
                 <td class="actions"><button class="btn sm danger" data-action="rm-comb">×</button></td>
               </tr>`).join("")}
           </tbody>
@@ -1674,7 +1674,7 @@ function renderMeta(c) {
         <article class="panel tight">
           <div class="panel-head"><h2 class="panel-title">Histórico</h2></div>
           ${diasMes.length === 0 ? `<p class="muted">Nenhum dia registrado neste mês.</p>` : `
-          <div class="table-wrap">
+          <div class="table-wrap stacked-rows">
             <table>
               <thead><tr><th>Dia</th><th>Uber</th><th>99</th><th>Total</th><th>Status</th><th></th></tr></thead>
               <tbody>
@@ -1683,11 +1683,11 @@ function renderMeta(c) {
                   const dd = t - meta;
                   return `
                     <tr data-id="${d.id}">
-                      <td>${fmtBR(d.data)}</td>
-                      <td class="num">${brl(d.uber)}</td>
-                      <td class="num">${brl(d.app99)}</td>
-                      <td class="num"><strong>${brl(t)}</strong></td>
-                      <td>${dd >= 0 ? `<span class="badge pago">+${brl(dd)}</span>` : `<span class="badge pendente">−${brl(-dd)}</span>`}</td>
+                      <td data-label="Dia">${fmtBR(d.data)}</td>
+                      <td class="num" data-label="Uber">${brl(d.uber)}</td>
+                      <td class="num" data-label="99">${brl(d.app99)}</td>
+                      <td class="num" data-label="Total"><strong>${brl(t)}</strong></td>
+                      <td data-label="Status">${dd >= 0 ? `<span class="badge pago">+${brl(dd)}</span>` : `<span class="badge pendente">−${brl(-dd)}</span>`}</td>
                       <td class="actions"><button class="btn sm danger" data-action="rm-uber">×</button></td>
                     </tr>`;
                 }).join("")}
@@ -1891,12 +1891,11 @@ function renderReserva() {
         </div>
       </div>
       ${movs.length === 0 ? `<p class="muted">Nenhum movimento registrado ainda. Faça seu primeiro depósito acima.</p>` : `
-      <div class="table-wrap">
+      <div class="table-wrap stacked-rows">
         <table>
           <thead><tr><th>Data</th><th>Tipo</th><th>Motivo</th><th>Valor</th><th>Saldo após</th><th></th></tr></thead>
           <tbody>
             ${(() => {
-              // calcular saldo progressivo (do mais antigo pro mais novo) e exibir do mais novo pro mais antigo
               const ord = movs.slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
               const saldoPorId = {};
               let acc = 0;
@@ -1906,11 +1905,11 @@ function renderReserva() {
               });
               return movs.map((m) => `
                 <tr data-rmov="${m.id}">
-                  <td>${fmtBR(m.data)}</td>
-                  <td>${m.tipo === "deposito" ? `<span class="badge pago">Depósito</span>` : `<span class="badge atrasado">Saque</span>`}</td>
-                  <td>${escapeHtml(m.descricao || "—")}</td>
-                  <td class="num ${m.tipo === "deposito" ? "ok" : "neg"}">${m.tipo === "deposito" ? "+" : "−"}${brl(m.valor)}</td>
-                  <td class="num"><strong>${brl(saldoPorId[m.id] || 0)}</strong></td>
+                  <td data-label="Data">${fmtBR(m.data)}</td>
+                  <td data-label="Tipo">${m.tipo === "deposito" ? `<span class="badge pago">Depósito</span>` : `<span class="badge atrasado">Saque</span>`}</td>
+                  <td data-label="Motivo">${escapeHtml(m.descricao || "—")}</td>
+                  <td class="num ${m.tipo === "deposito" ? "ok" : "neg"}" data-label="Valor">${m.tipo === "deposito" ? "+" : "−"}${brl(m.valor)}</td>
+                  <td class="num" data-label="Saldo após"><strong>${brl(saldoPorId[m.id] || 0)}</strong></td>
                   <td class="actions"><button class="btn sm danger" data-action="rm-rmov">×</button></td>
                 </tr>`).join("");
             })()}
