@@ -3,33 +3,65 @@
    Estado persistido em localStorage. Tudo editavel.
 ========================================================= */
 
-const STORAGE_KEY = "caua_financas_v4";
+const STORAGE_KEY = "caua_financas_v6";
+
+const SANT_ID = "santander_default";
 
 const DEFAULT_STATE = {
   periodo: "mes",
   referencia: todayISO(),
   caixa: [
-    { id: uid(), local: "Banco Santander", valor: 419.22 },
-    { id: uid(), local: "Espécie",         valor: 25.0   },
-    { id: uid(), local: "Saldo Uber",      valor: 23.42  },
-    { id: uid(), local: "Saldo 99",        valor: 72.65  }
+    { id: SANT_ID,  local: "Banco Santander", valor: 419.22, cor: "#e60000" },
+    { id: uid(),    local: "Espécie",         valor: 25.0,   cor: "#43a047" },
+    { id: uid(),    local: "Saldo Uber",      valor: 23.42,  cor: "#000000" },
+    { id: uid(),    local: "Saldo 99",        valor: 72.65,  cor: "#ffd400" }
   ],
   contas: [
-    { id: uid(), descricao: "Cartão tia",  grupo: "tia",    vencimento: "2026-05-10", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 331.24, valorPago: 0, prioridade: 1, status: "pendente" },
-    { id: uid(), descricao: "Aluguel",     grupo: "outras", vencimento: "2026-05-10", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 500.0,  valorPago: 0, prioridade: 2, status: "pendente" },
-    { id: uid(), descricao: "Energia",     grupo: "outras", vencimento: "2026-05-10", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 125.0,  valorPago: 0, prioridade: 3, status: "pendente" },
-    { id: uid(), descricao: "Internet",    grupo: "outras", vencimento: "2026-05-10", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 31.0,   valorPago: 0, prioridade: 4, status: "pendente" },
-    { id: uid(), descricao: "Dentista",    grupo: "outras", vencimento: "2026-05-10", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 75.0,   valorPago: 0, prioridade: 5, status: "pendente" }
+    {
+      id: uid(), descricao: "Cartão tia", grupo: "tia",
+      vencimento: "2026-05-10", prioridade: 1, status: "pendente",
+      cor: "#c2185b",
+      itens: [
+        { id: uid(), descricao: "Compra exemplo", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 331.24, valorPago: 0 }
+      ]
+    },
+    {
+      id: uid(), descricao: "Aluguel", grupo: "outras",
+      vencimento: "2026-05-10", prioridade: 2, status: "pendente",
+      cor: "#5d4037",
+      itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 500.0, valorPago: 0 }]
+    },
+    {
+      id: uid(), descricao: "Energia", grupo: "outras",
+      vencimento: "2026-05-10", prioridade: 3, status: "pendente",
+      cor: "#fbc02d",
+      itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 125.0, valorPago: 0 }]
+    },
+    {
+      id: uid(), descricao: "Internet", grupo: "outras",
+      vencimento: "2026-05-10", prioridade: 4, status: "pendente",
+      cor: "#0288d1",
+      itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 31.0, valorPago: 0 }]
+    },
+    {
+      id: uid(), descricao: "Dentista", grupo: "outras",
+      vencimento: "2026-05-15", prioridade: 5, status: "pendente",
+      cor: "#7b1fa2",
+      itens: [{ id: uid(), descricao: "Sessão", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 75.0, valorPago: 0 }]
+    }
   ],
   categorias: [
-    { id: uid(), nome: "Alimentação", meta: 250, cor: "#4caf50" },
-    { id: uid(), nome: "Combustível", meta: 280, cor: "#ff9800" },
-    { id: uid(), nome: "Lanche",      meta: 120, cor: "#03a9f4" },
-    { id: uid(), nome: "Casa",        meta: 100, cor: "#9c27b0" },
-    { id: uid(), nome: "Reserva",     meta: 500, cor: "#3f51b5" }
+    { id: uid(), nome: "Alimentação", cor: "#4caf50", excluirDoLimite: false },
+    { id: uid(), nome: "Combustível", cor: "#ff9800", excluirDoLimite: true  },
+    { id: uid(), nome: "Lanche",      cor: "#03a9f4", excluirDoLimite: false },
+    { id: uid(), nome: "Casa",        cor: "#9c27b0", excluirDoLimite: false },
+    { id: uid(), nome: "Reserva",     cor: "#3f51b5", excluirDoLimite: false }
   ],
   movimentacoes: [
-    /* { id, tipo: "Entrada"|"Gasto", data, categoria, descricao, valor } */
+    /* { id, tipo: "Entrada"|"Gasto", data, categoria, descricao, valor, fonteId } */
+  ],
+  aReceber: [
+    /* { id, descricao, cor, parcelasTotal, parcelasRecebidas, valorParcela, proximoVencimento, fonteId } */
   ],
   uberDias: [
     /* { id, data: "2026-05-07", uber: 115.41, app99: 27.75 } */
@@ -49,7 +81,8 @@ const DEFAULT_STATE = {
   ],
   config: {
     fechamentoDia: 10,
-    metaUberDiaria: 120
+    metaUberDiaria: 120,
+    limiteMensal: 500
   }
 };
 
@@ -104,6 +137,14 @@ function isWeekday(date) {
   const day = date.getDay();
   return day >= 1 && day <= 5;
 }
+function diasRestantesNoMes() {
+  const ref = parseISO(state.referencia);
+  const ultimo = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+  return Math.max(1, ultimo - ref.getDate() + 1);
+}
+function podePorDiaMes(c) {
+  return Math.max(0, c.podeGastarMes / diasRestantesNoMes());
+}
 function diasAteFechamento() {
   const ref = parseISO(state.referencia);
   const fechamento = new Date(ref.getFullYear(), ref.getMonth(), state.config.fechamentoDia);
@@ -140,17 +181,33 @@ function toast(msg) {
 
 /* ---------- COMPUTE ---------- */
 
+function caixaSaldoCalculado(fonte) {
+  // Saldo da fonte = valor base + lançamentos atribuídos a ela
+  const ajuste = sum(state.movimentacoes
+    .filter((m) => m.fonteId === fonte.id)
+    .map((m) => m.tipo === "Entrada" ? (m.valor || 0) : -(m.valor || 0)));
+  return (fonte.valor || 0) + ajuste;
+}
+
+function valorAbertoConta(c) {
+  if (c.status === "pago") return 0;
+  return sum((c.itens || []).map((i) => Math.max(0, (i.valorParcela || 0) - (i.valorPago || 0))));
+}
+function valorTotalConta(c) {
+  return sum((c.itens || []).map((i) => i.valorParcela || 0));
+}
+
 function compute() {
-  const caixaTotal = sum(state.caixa.map((x) => x.valor));
+  const caixaTotal = sum(state.caixa.map((x) => caixaSaldoCalculado(x)));
   const movPeriodo = state.movimentacoes.filter((m) => inSelectedPeriod(m.data));
 
   const entradas = sum(movPeriodo.filter((m) => m.tipo === "Entrada").map((m) => m.valor));
   const gastos = sum(movPeriodo.filter((m) => m.tipo === "Gasto").map((m) => m.valor));
-  const caixaAtual = caixaTotal + entradas - gastos;
+  const caixaAtual = caixaTotal;
 
   const contasPendentes = state.contas.filter((c) => c.status !== "pago");
-  const valorTotalAbertoContas = sum(contasPendentes.map((c) => Math.max(0, (c.valorParcela || 0) - (c.valorPago || 0))));
-  const totalContasGeral = sum(state.contas.map((c) => c.valorParcela || 0));
+  const valorTotalAbertoContas = sum(contasPendentes.map((c) => valorAbertoConta(c)));
+  const totalContasGeral = sum(state.contas.map((c) => valorTotalConta(c)));
 
   const deficit = valorTotalAbertoContas - caixaAtual;
 
@@ -162,17 +219,26 @@ function compute() {
   });
   const categoriasResumo = state.categorias.map((c) => {
     const gasto = gastoPorCategoria[c.nome] || 0;
-    const restante = c.meta - gasto;
-    const percentual = c.meta > 0 ? (gasto / c.meta) * 100 : 0;
-    return { ...c, gasto, restante, percentual };
+    return { ...c, gasto };
   });
+
+  // Limite único mensal (gastos pessoais, EXCLUINDO combustível)
+  const isCatExcluida = (nome) => state.categorias.some((c) => c.nome === nome && c.excluirDoLimite);
+  const limiteMensal = state.config.limiteMensal || 500;
+  const movMes = state.movimentacoes.filter((m) => {
+    const d = parseISO(m.data);
+    const r = parseISO(state.referencia);
+    return d.getMonth() === r.getMonth() && d.getFullYear() === r.getFullYear();
+  });
+  const gastoLimite = sum(movMes.filter((m) => m.tipo === "Gasto" && !isCatExcluida(m.categoria)).map((m) => m.valor));
+  const podeGastarMes = limiteMensal - gastoLimite;
 
   const fech = diasAteFechamento();
 
   return {
     movPeriodo, caixaTotal, entradas, gastos, caixaAtual,
     contasPendentes, valorTotalAbertoContas, totalContasGeral, deficit,
-    categoriasResumo, fech
+    categoriasResumo, fech, limiteMensal, gastoLimite, podeGastarMes
   };
 }
 
@@ -239,16 +305,17 @@ function renderDashboard(c) {
     <section class="panel">
       <div class="panel-head">
         <h2 class="panel-title">Lançar movimentação rápida</h2>
-        <p class="panel-sub">Adicione entradas ou gastos do dia</p>
+        <p class="panel-sub">Entradas somam na fonte · gastos saem da fonte (padrão Santander)</p>
       </div>
-      <form id="quick-mov" class="form-grid cols-mov">
+      <form id="quick-mov" class="form-grid cols-mov-fonte">
         <select name="tipo" id="quick-tipo" required>
           <option value="Gasto">Gasto</option>
           <option value="Entrada">Entrada</option>
         </select>
+        <select name="fonteId" id="quick-fonte" required>${fonteOptions()}</select>
         <select name="categoria" id="quick-cat" required>${categoriaOptions()}</select>
         <input name="data" type="date" required value="${state.referencia}" />
-        <input name="descricao" required placeholder="Descrição (ex: din din)" maxlength="60" />
+        <input name="descricao" required placeholder="Descrição (ex: tinta entrou)" maxlength="60" />
         <input name="valor" type="number" min="0.01" step="0.01" required placeholder="Valor" />
         <button class="btn" type="submit">Adicionar</button>
       </form>
@@ -257,39 +324,51 @@ function renderDashboard(c) {
     <section class="panel">
       <div class="panel-head">
         <div>
-          <h2 class="panel-title">Controle por categoria</h2>
-          <p class="panel-sub">Meta vs gasto no período — quanto ainda pode gastar</p>
+          <h2 class="panel-title">Limite mensal de gastos pessoais</h2>
+          <p class="panel-sub">Você pode gastar <strong>${brl(c.limiteMensal)}/mês</strong> · combustível <em>não conta</em></p>
+        </div>
+        <div class="period-row">
+          <label class="muted">Limite</label>
+          <input type="number" id="dash-limite" min="0" step="10" value="${c.limiteMensal}" style="width:120px;" />
         </div>
       </div>
-      <div>
-        ${c.categoriasResumo.map((x) => {
-          const pct = Math.min(100, x.percentual);
-          const cls = x.percentual >= 100 ? "over" : x.percentual >= 80 ? "warn" : "";
-          const restCls = x.restante < 0 ? "neg" : "ok";
-          return `
-            <div class="bar-row">
-              <div class="name">${x.nome}</div>
-              <div class="bar">
-                <div class="progress"><div class="fill ${cls}" style="width:${pct}%"></div></div>
-              </div>
-              <div class="vals">
-                <strong>${brl(x.gasto)}</strong> / ${brl(x.meta)}
-                <div class="${restCls}">${x.restante < 0 ? "passou " + brl(-x.restante) : "pode " + brl(x.restante)}</div>
-              </div>
-            </div>`;
-        }).join("")}
+
+      <div class="kpi-grid">
+        <div class="kpi info">
+          <h3>Limite mensal</h3>
+          <div class="value">${brl(c.limiteMensal)}</div>
+          <div class="sub">Combustível separado</div>
+        </div>
+        <div class="kpi warn">
+          <h3>Gasto no mês</h3>
+          <div class="value neg">${brl(c.gastoLimite)}</div>
+          <div class="sub">${fmtPct(c.limiteMensal > 0 ? (c.gastoLimite / c.limiteMensal) * 100 : 0)} usado</div>
+        </div>
+        <div class="kpi ${c.podeGastarMes < 0 ? "danger" : "ok"}">
+          <h3>Pode gastar</h3>
+          <div class="value ${c.podeGastarMes < 0 ? "neg" : "pos"}">${brl(Math.max(0, c.podeGastarMes))}</div>
+          <div class="sub">${c.podeGastarMes < 0 ? "Passou do limite" : "Restante do mês"}</div>
+        </div>
+        <div class="kpi">
+          <h3>Por dia</h3>
+          <div class="value">${brl(podePorDiaMes(c))}</div>
+          <div class="sub">${diasRestantesNoMes()} dia(s) restantes</div>
+        </div>
       </div>
+
+      <div class="progress" style="height:14px;"><div class="fill ${c.gastoLimite >= c.limiteMensal ? "over" : c.gastoLimite >= c.limiteMensal * 0.8 ? "warn" : ""}" style="width:${Math.min(100, (c.gastoLimite / Math.max(1, c.limiteMensal)) * 100)}%"></div></div>
+      <p class="hint">Esse painel já desconta combustível — você vê na aba <strong>Combustível</strong>.</p>
     </section>
 
     <section class="chart-grid">
       <article class="panel">
-        <div class="panel-head"><h2 class="panel-title">Gastos por categoria</h2></div>
+        <div class="panel-head"><h2 class="panel-title">Gastos por categoria (período)</h2></div>
         <div class="chart-box"><canvas id="pieChart"></canvas></div>
         <p id="pie-empty" class="hint"></p>
       </article>
       <article class="panel">
-        <div class="panel-head"><h2 class="panel-title">Meta × Gasto</h2></div>
-        <div class="chart-box"><canvas id="barChart"></canvas></div>
+        <div class="panel-head"><h2 class="panel-title">Disponível por dia (mês)</h2></div>
+        <div class="chart-box"><canvas id="lineDash"></canvas></div>
       </article>
     </section>
   `;
@@ -304,6 +383,10 @@ function renderDashboard(c) {
     state.referencia = e.target.value || todayISO();
     saveState(); renderAll();
   });
+  document.getElementById("dash-limite").addEventListener("change", (e) => {
+    state.config.limiteMensal = Number(e.target.value) || 500;
+    saveState(); renderAll();
+  });
   document.getElementById("quick-mov").addEventListener("submit", (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -312,7 +395,8 @@ function renderDashboard(c) {
       categoria: fd.get("categoria"),
       data: fd.get("data"),
       descricao: String(fd.get("descricao") || "").trim(),
-      valor: Number(fd.get("valor") || 0)
+      valor: Number(fd.get("valor") || 0),
+      fonteId: fd.get("fonteId")
     });
     e.currentTarget.reset();
     document.querySelector("#quick-mov [name=data]").value = state.referencia;
@@ -330,19 +414,35 @@ function categoriaOptions(selected) {
   return state.categorias.map((x) => `<option value="${x.nome}" ${selected === x.nome ? "selected" : ""}>${x.nome}</option>`).join("");
 }
 
-function addMovimentacao({ tipo, categoria, data, descricao, valor }) {
+function fontePadrao() {
+  return state.caixa.find((x) => x.id === SANT_ID) || state.caixa[0];
+}
+function fonteOptions(selectedId) {
+  const sel = selectedId || fontePadrao()?.id;
+  return state.caixa.map((x) => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${escapeHtml(x.local)}</option>`).join("");
+}
+function fonteNome(id) {
+  return state.caixa.find((x) => x.id === id)?.local || "—";
+}
+function fonteCor(id) {
+  return state.caixa.find((x) => x.id === id)?.cor || "#5c6b56";
+}
+
+function addMovimentacao({ tipo, categoria, data, descricao, valor, fonteId }) {
   if (!descricao || !Number.isFinite(valor) || valor <= 0) {
     toast("Preencha descrição e valor."); return;
   }
+  const fId = fonteId || fontePadrao()?.id;
   state.movimentacoes.unshift({
     id: uid(),
     tipo: tipo === "Entrada" ? "Entrada" : "Gasto",
     categoria: tipo === "Gasto" ? (categoria || "Alimentação") : "",
     data: data || todayISO(),
     descricao,
-    valor: Number(valor)
+    valor: Number(valor),
+    fonteId: fId
   });
-  saveState(); toast("Lançamento adicionado"); renderAll();
+  saveState(); toast(`${tipo === "Entrada" ? "Entrada" : "Gasto"} em ${fonteNome(fId)}`); renderAll();
 }
 
 /* ---------- RENDER: CHARTS ---------- */
@@ -353,16 +453,17 @@ function renderCharts(c) {
     if (m) m.textContent = "Chart.js indisponível.";
     return;
   }
-  const labels = c.categoriasResumo.map((x) => x.nome);
-  const cores  = c.categoriasResumo.map((x) => x.cor || "#4caf50");
-  const gastos = c.categoriasResumo.map((x) => Number(x.gasto.toFixed(2)));
-  const metas  = c.categoriasResumo.map((x) => Number(x.meta.toFixed(2)));
+  // Pizza: gastos por categoria EXCLUINDO combustível (que tem aba própria)
+  const filtradas = c.categoriasResumo.filter((x) => !x.excluirDoLimite && x.gasto > 0);
+  const labels = filtradas.map((x) => x.nome);
+  const cores  = filtradas.map((x) => x.cor || "#4caf50");
+  const gastos = filtradas.map((x) => Number(x.gasto.toFixed(2)));
   const totalG = sum(gastos);
 
-  ["pieChart", "barChart"].forEach((k) => { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
+  ["pieChart", "barChart", "lineDash"].forEach((k) => { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
 
   const msg = document.getElementById("pie-empty");
-  if (msg) msg.textContent = totalG === 0 ? "Sem gastos no período. Lance um gasto para preencher a pizza." : "";
+  if (msg) msg.textContent = totalG === 0 ? "Sem gastos pessoais no período. (Combustível aparece na aba própria.)" : "";
 
   charts.pieChart = new Chart(document.getElementById("pieChart"), {
     type: "doughnut",
@@ -381,13 +482,33 @@ function renderCharts(c) {
     }
   });
 
-  charts.barChart = new Chart(document.getElementById("barChart"), {
-    type: "bar",
+  // Linha do disponível por dia no mês
+  const ref = parseISO(state.referencia);
+  const diasNoMes = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+  const isCatExcluida = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
+  const linhaReal = [];
+  const linhaIdeal = [];
+  const dataLabels = [];
+  const idealPorDia = c.limiteMensal / diasNoMes;
+  let acc = 0;
+  for (let d = 1; d <= diasNoMes; d++) {
+    dataLabels.push(String(d).padStart(2, "0"));
+    const dia = new Date(ref.getFullYear(), ref.getMonth(), d);
+    const iso = toISO(dia);
+    const gastoDoDia = sum(state.movimentacoes
+      .filter((m) => m.tipo === "Gasto" && m.data === iso && !isCatExcluida(m.categoria))
+      .map((m) => m.valor));
+    acc += gastoDoDia;
+    linhaReal.push(Math.max(0, c.limiteMensal - acc));
+    linhaIdeal.push(Math.max(0, c.limiteMensal - idealPorDia * d));
+  }
+  charts.lineDash = new Chart(document.getElementById("lineDash"), {
+    type: "line",
     data: {
-      labels,
+      labels: dataLabels,
       datasets: [
-        { label: "Meta",  data: metas,  backgroundColor: "#a8d6a8", borderRadius: 6 },
-        { label: "Gasto", data: gastos, backgroundColor: "#2f7d32", borderRadius: 6 }
+        { label: "Disponível real", data: linhaReal, borderColor: "#2f7d32", backgroundColor: "rgba(47,125,50,0.12)", fill: true, tension: 0.3, pointRadius: 0 },
+        { label: "Ritmo ideal", data: linhaIdeal, borderColor: "#90a4ae", borderDash: [5, 5], fill: false, pointRadius: 0 }
       ]
     },
     options: {
@@ -402,56 +523,75 @@ function renderCharts(c) {
 
 function renderContas(c) {
   const el = document.getElementById("contas");
-
-  const renderGrupo = (titulo, badge, lista) => {
-    if (!lista.length) return "";
-    const totalAberto = sum(lista.map((x) => Math.max(0, (x.valorParcela || 0) - (x.valorPago || 0))));
-    const totalGeral = sum(lista.map((x) => x.valorParcela || 0));
-    return `
-      <tr class="section">
-        <td colspan="9">${titulo} — em aberto: ${brl(totalAberto)} / total: ${brl(totalGeral)}</td>
-      </tr>
-      ${lista.sort((a, b) => (a.prioridade || 99) - (b.prioridade || 99)).map((x) => {
-        const valorTotalDivida = (x.valorParcela || 0) * (x.parcelasTotal || 1);
-        const aberto = Math.max(0, (x.valorParcela || 0) - (x.valorPago || 0));
-        const quitada = x.status === "pago" || aberto === 0;
-        const parcial = !quitada && (x.valorPago || 0) > 0;
-        const status = quitada ? "pago" : parcial ? "parcial" : "pendente";
-        const statusLabel = quitada ? "Pago" : parcial ? `Parcial · faltam ${brl(aberto)}` : "Pendente";
-        return `
-          <tr class="${quitada ? "row-paid" : ""}" data-id="${x.id}">
-            <td>
-              <strong>${escapeHtml(x.descricao)}</strong>
-              <div class="muted" style="font-size:0.82rem; margin-top:2px;">
-                ${brl(x.valorParcela)} <span class="pill">${x.parcelaAtual || 1}/${x.parcelasTotal || 1}</span>
-                <span class="pill">total ${brl(valorTotalDivida)}</span>
-                ${parcial ? `<span class="pill faltam">falta ${brl(aberto)}</span>` : ""}
-                ${quitada ? `<span class="pill quitada">quitada</span>` : ""}
-              </div>
-            </td>
-            <td><span class="badge ${badge}">${badge === "tia" ? "Tia" : "Outras"}</span></td>
-            <td>${fmtBR(x.vencimento)}</td>
-            <td class="num">${brl(x.valorParcela)}</td>
-            <td class="num">${brl(x.valorPago || 0)}</td>
-            <td class="num"><strong>${brl(aberto)}</strong></td>
-            <td>${x.parcelaAtual || 1}/${x.parcelasTotal || 1}</td>
-            <td><span class="badge ${status}">${statusLabel}</span></td>
-            <td class="actions">
-              ${!quitada ? `<button class="btn sm success" data-action="quitar">Pagar</button>` : `<button class="btn sm ghost" data-action="reabrir">Reabrir</button>`}
-              <button class="btn sm ghost" data-action="pagar-parcial">Parcial</button>
-              <button class="btn sm ghost" data-action="editar">Editar</button>
-              <button class="btn sm danger" data-action="remover">×</button>
-            </td>
-          </tr>`;
-      }).join("")}
-    `;
-  };
-
-  const tia = state.contas.filter((x) => x.grupo === "tia");
-  const outras = state.contas.filter((x) => x.grupo !== "tia");
   const fech = c.fech;
   const totalAberto = c.valorTotalAbertoContas;
   const restante = Math.max(0, totalAberto - c.caixaAtual);
+
+  // Ordena por prioridade
+  const contasOrdenadas = state.contas.slice().sort((a, b) => (a.prioridade || 99) - (b.prioridade || 99));
+
+  const renderConta = (conta) => {
+    const aberto = valorAbertoConta(conta);
+    const total = valorTotalConta(conta);
+    const pago = total - aberto;
+    const quitada = conta.status === "pago" || aberto === 0;
+    const pct = total > 0 ? (pago / total) * 100 : 0;
+    const itens = (conta.itens || []);
+    return `
+      <article class="conta-card" data-conta="${conta.id}" style="--conta-cor:${conta.cor || "#2f7d32"};">
+        <header class="conta-head">
+          <div class="conta-title">
+            <span class="conta-dot"></span>
+            <strong>${escapeHtml(conta.descricao)}</strong>
+            <span class="badge ${conta.grupo === "tia" ? "tia" : "outras"}">${conta.grupo === "tia" ? "Tia" : "Outras"}</span>
+            ${quitada ? `<span class="badge pago">Quitada</span>` : pago > 0 ? `<span class="badge parcial">Parcial</span>` : `<span class="badge pendente">Pendente</span>`}
+          </div>
+          <div class="conta-meta">
+            <span class="muted">vence ${fmtBR(conta.vencimento)}</span>
+            <span class="pill">total ${brl(total)}</span>
+            <span class="pill ${aberto > 0 ? "faltam" : "quitada"}">${aberto > 0 ? `falta ${brl(aberto)}` : "quitada"}</span>
+          </div>
+        </header>
+
+        <div class="progress" style="height:8px;"><div class="fill" style="width:${pct}%; background: var(--conta-cor);"></div></div>
+
+        <div class="conta-itens">
+          ${itens.length === 0 ? `<p class="muted" style="margin:8px 0;">Nenhum item. Adicione abaixo.</p>` : `
+          <table>
+            <thead><tr><th>Item</th><th>Parcela</th><th>Valor</th><th>Total</th><th>Pago</th><th>Falta</th><th></th></tr></thead>
+            <tbody>
+              ${itens.map((it) => {
+                const totalItem = (it.valorParcela || 0) * (it.parcelasTotal || 1);
+                const abertoItem = Math.max(0, (it.valorParcela || 0) - (it.valorPago || 0));
+                const itemPago = abertoItem === 0;
+                return `
+                  <tr data-item="${it.id}" class="${itemPago ? "row-paid" : ""}">
+                    <td>${escapeHtml(it.descricao || "Item")}</td>
+                    <td><span class="pill">${it.parcelaAtual || 1}/${it.parcelasTotal || 1}</span></td>
+                    <td class="num">${brl(it.valorParcela)}</td>
+                    <td class="num muted">${brl(totalItem)}</td>
+                    <td class="num">${brl(it.valorPago || 0)}</td>
+                    <td class="num"><strong class="${abertoItem > 0 ? "warn" : "ok"}">${brl(abertoItem)}</strong></td>
+                    <td class="actions">
+                      ${!itemPago ? `<button class="btn sm success" data-act="quit-item">Pagar</button>` : `<button class="btn sm ghost" data-act="reabrir-item">Reabrir</button>`}
+                      <button class="btn sm ghost" data-act="parc-item">Parcial</button>
+                      <button class="btn sm ghost" data-act="edit-item">Editar</button>
+                      <button class="btn sm danger" data-act="rm-item">×</button>
+                    </td>
+                  </tr>`;
+              }).join("")}
+            </tbody>
+          </table>`}
+        </div>
+
+        <footer class="conta-foot">
+          <button class="btn sm ghost" data-act="add-item">+ Adicionar item / parcela</button>
+          <button class="btn sm ghost" data-act="edit-conta">Editar conta</button>
+          <button class="btn sm danger" data-act="rm-conta">Remover</button>
+        </footer>
+      </article>
+    `;
+  };
 
   el.innerHTML = `
     <section class="panel">
@@ -477,7 +617,7 @@ function renderContas(c) {
         <div class="kpi warn">
           <h3>Falta juntar</h3>
           <div class="value ${restante > 0 ? "neg" : "pos"}">${brl(restante)}</div>
-          <div class="sub">${fech.dias > 0 && restante > 0 ? `${brl(restante / fech.dias)}/dia até dia ${state.config.fechamentoDia}` : "Você consegue fechar com o caixa atual"}</div>
+          <div class="sub">${fech.dias > 0 && restante > 0 ? `${brl(restante / fech.dias)}/dia até dia ${state.config.fechamentoDia}` : "Você fecha com o caixa atual"}</div>
         </div>
         <div class="kpi info">
           <h3>Total geral</h3>
@@ -486,29 +626,21 @@ function renderContas(c) {
         </div>
       </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Despesa</th>
-              <th>Grupo</th>
-              <th>Vencimento</th>
-              <th>Parcela</th>
-              <th>Pago</th>
-              <th>Em aberto</th>
-              <th>Nº</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${renderGrupo("Tia", "tia", tia)}
-            ${renderGrupo("Outras (aluguel, energia, internet, etc.)", "outras", outras)}
-            ${state.contas.length === 0 ? `<tr><td colspan="9" class="muted">Nenhuma conta cadastrada. Clique em <strong>+ Nova conta</strong>.</td></tr>` : ""}
-          </tbody>
-        </table>
+      <div class="chart-grid">
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Em aberto por conta</h2></div>
+          <div class="chart-box"><canvas id="chartContasBar"></canvas></div>
+        </article>
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Distribuição</h2></div>
+          <div class="chart-box"><canvas id="chartContasPie"></canvas></div>
+        </article>
       </div>
     </section>
+
+    <div class="contas-grid">
+      ${contasOrdenadas.length === 0 ? `<p class="muted">Nenhuma conta. Clique em <strong>+ Nova conta</strong>.</p>` : contasOrdenadas.map(renderConta).join("")}
+    </div>
 
     <section class="panel" id="form-conta-panel" style="display:none;">
       <div class="panel-head">
@@ -516,104 +648,203 @@ function renderContas(c) {
         <button class="btn ghost" id="cancel-conta">Cancelar</button>
       </div>
       <form id="form-conta" class="form-grid cols-conta">
-        <input name="descricao" placeholder="Descrição" required maxlength="60" />
+        <input name="descricao" placeholder="Descrição (ex: Cartão tia, Aluguel)" required maxlength="60" />
         <select name="grupo" required>
           <option value="outras">Outras</option>
           <option value="tia">Tia</option>
         </select>
         <input name="vencimento" type="date" required />
+        <input name="cor" type="color" value="#2f7d32" />
+        <button class="btn" type="submit">Salvar</button>
+      </form>
+      <p class="hint">Depois de criar a conta, adicione os itens dentro dela (cada item tem parcelas).</p>
+    </section>
+
+    <section class="panel" id="form-item-panel" style="display:none;">
+      <div class="panel-head">
+        <h2 class="panel-title" id="form-item-title">Novo item / parcela</h2>
+        <button class="btn ghost" id="cancel-item">Cancelar</button>
+      </div>
+      <form id="form-item" class="form-grid cols-conta-item">
+        <input name="descricao" placeholder="Item (ex: Tablet)" required maxlength="60" />
         <input name="parcelaAtual" type="number" min="1" step="1" placeholder="Parc. atual" required />
         <input name="parcelasTotal" type="number" min="1" step="1" placeholder="Parc. total" required />
         <input name="valorParcela" type="number" min="0.01" step="0.01" placeholder="Valor parcela" required />
         <input name="valorPago" type="number" min="0" step="0.01" placeholder="Pago (parcial)" value="0" />
-        <button class="btn" type="submit">Salvar</button>
+        <button class="btn" type="submit">Salvar item</button>
       </form>
-      <p class="hint">
-        Dica: se a dívida tem 3 parcelas de R$ 50, lance <strong>parcela atual = 1</strong>, <strong>total = 3</strong>, <strong>valor = 50</strong>.
-        O painel mostra <code>R$ 50 · 1/3 · total R$ 150</code>.
-      </p>
+      <p class="hint">Ex: tablet 11/12 R$ 50 · total da dívida será R$ 600.</p>
     </section>
   `;
 
   bindContas();
+  renderContasCharts(contasOrdenadas);
+}
+
+function renderContasCharts(contas) {
+  if (typeof Chart === "undefined") return;
+  ["chartContasBar", "chartContasPie"].forEach((k) => { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
+  const labels = contas.map((c) => c.descricao);
+  const cores = contas.map((c) => c.cor || "#2f7d32");
+  const abertos = contas.map((c) => Number(valorAbertoConta(c).toFixed(2)));
+  const totais = contas.map((c) => Number(valorTotalConta(c).toFixed(2)));
+
+  charts.chartContasBar = new Chart(document.getElementById("chartContasBar"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "Total", data: totais, backgroundColor: cores.map((c) => c + "55"), borderRadius: 6 },
+        { label: "Em aberto", data: abertos, backgroundColor: cores, borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } }
+    }
+  });
+
+  charts.chartContasPie = new Chart(document.getElementById("chartContasPie"), {
+    type: "doughnut",
+    data: { labels, datasets: [{ data: abertos, backgroundColor: cores, borderWidth: 2, borderColor: "#fff" }] },
+    options: {
+      cutout: "60%", maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } }
+    }
+  });
 }
 
 function bindContas() {
-  const panel = document.getElementById("form-conta-panel");
-  const form = document.getElementById("form-conta");
-  const title = document.getElementById("form-conta-title");
-  let editingId = null;
+  const panelConta = document.getElementById("form-conta-panel");
+  const formConta = document.getElementById("form-conta");
+  const titleConta = document.getElementById("form-conta-title");
+  let editingContaId = null;
 
-  const showForm = (conta) => {
-    editingId = conta ? conta.id : null;
-    title.textContent = conta ? "Editar conta" : "Nova conta";
-    form.descricao.value = conta?.descricao || "";
-    form.grupo.value = conta?.grupo || "outras";
-    form.vencimento.value = conta?.vencimento || state.referencia;
-    form.parcelaAtual.value = conta?.parcelaAtual || 1;
-    form.parcelasTotal.value = conta?.parcelasTotal || 1;
-    form.valorParcela.value = conta?.valorParcela || "";
-    form.valorPago.value = conta?.valorPago || 0;
-    panel.style.display = "block";
-    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  const showFormConta = (conta) => {
+    editingContaId = conta ? conta.id : null;
+    titleConta.textContent = conta ? "Editar conta" : "Nova conta";
+    formConta.descricao.value = conta?.descricao || "";
+    formConta.grupo.value = conta?.grupo || "outras";
+    formConta.vencimento.value = conta?.vencimento || state.referencia;
+    formConta.cor.value = conta?.cor || "#2f7d32";
+    panelConta.style.display = "block";
+    panelConta.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  document.getElementById("add-conta").addEventListener("click", () => showForm(null));
-  document.getElementById("cancel-conta").addEventListener("click", () => { panel.style.display = "none"; });
+  document.getElementById("add-conta").addEventListener("click", () => showFormConta(null));
+  document.getElementById("cancel-conta").addEventListener("click", () => { panelConta.style.display = "none"; });
 
-  form.addEventListener("submit", (e) => {
+  formConta.addEventListener("submit", (e) => {
     e.preventDefault();
-    const fd = new FormData(form);
+    const fd = new FormData(formConta);
     const data = {
       descricao: String(fd.get("descricao") || "").trim(),
       grupo: fd.get("grupo") === "tia" ? "tia" : "outras",
       vencimento: fd.get("vencimento"),
+      cor: fd.get("cor") || "#2f7d32"
+    };
+    if (!data.descricao) { toast("Preencha descrição."); return; }
+    if (editingContaId) {
+      state.contas = state.contas.map((c) => c.id === editingContaId ? { ...c, ...data } : c);
+      toast("Conta atualizada");
+    } else {
+      state.contas.push({ id: uid(), prioridade: state.contas.length + 1, status: "pendente", itens: [], ...data });
+      toast("Conta adicionada — agora adicione os itens");
+    }
+    saveState(); panelConta.style.display = "none"; renderAll();
+  });
+
+  // Item form
+  const panelItem = document.getElementById("form-item-panel");
+  const formItem = document.getElementById("form-item");
+  const titleItem = document.getElementById("form-item-title");
+  let itemContext = null; // { contaId, itemId? }
+
+  const showFormItem = (contaId, item) => {
+    itemContext = { contaId, itemId: item?.id };
+    titleItem.textContent = item ? "Editar item" : "Novo item / parcela";
+    formItem.descricao.value = item?.descricao || "";
+    formItem.parcelaAtual.value = item?.parcelaAtual || 1;
+    formItem.parcelasTotal.value = item?.parcelasTotal || 1;
+    formItem.valorParcela.value = item?.valorParcela || "";
+    formItem.valorPago.value = item?.valorPago || 0;
+    panelItem.style.display = "block";
+    panelItem.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  document.getElementById("cancel-item").addEventListener("click", () => { panelItem.style.display = "none"; });
+
+  formItem.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!itemContext) return;
+    const fd = new FormData(formItem);
+    const data = {
+      descricao: String(fd.get("descricao") || "").trim() || "Item",
       parcelaAtual: Number(fd.get("parcelaAtual") || 1),
       parcelasTotal: Number(fd.get("parcelasTotal") || 1),
       valorParcela: Number(fd.get("valorParcela") || 0),
       valorPago: Number(fd.get("valorPago") || 0)
     };
-    if (!data.descricao || data.valorParcela <= 0) { toast("Preencha descrição e valor."); return; }
-    if (editingId) {
-      state.contas = state.contas.map((c) => c.id === editingId ? { ...c, ...data, status: data.valorPago >= data.valorParcela ? "pago" : "pendente" } : c);
-      toast("Conta atualizada");
+    if (data.valorParcela <= 0) { toast("Valor inválido."); return; }
+    const conta = state.contas.find((c) => c.id === itemContext.contaId);
+    if (!conta) return;
+    if (!conta.itens) conta.itens = [];
+    if (itemContext.itemId) {
+      conta.itens = conta.itens.map((i) => i.id === itemContext.itemId ? { ...i, ...data } : i);
+      toast("Item atualizado");
     } else {
-      state.contas.push({ id: uid(), prioridade: state.contas.length + 1, status: data.valorPago >= data.valorParcela ? "pago" : "pendente", ...data });
-      toast("Conta adicionada");
+      conta.itens.push({ id: uid(), ...data });
+      toast("Item adicionado");
     }
-    saveState(); panel.style.display = "none"; renderAll();
+    // Atualiza status global da conta
+    conta.status = valorAbertoConta(conta) === 0 ? "pago" : "pendente";
+    saveState(); panelItem.style.display = "none"; renderAll();
   });
 
-  document.querySelectorAll("#contas tbody tr[data-id]").forEach((tr) => {
-    const id = tr.getAttribute("data-id");
-    tr.querySelectorAll("[data-action]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const conta = state.contas.find((c) => c.id === id);
-        if (!conta) return;
-        const action = btn.getAttribute("data-action");
-        if (action === "quitar") {
-          conta.valorPago = conta.valorParcela;
-          conta.status = "pago";
-          toast("Conta marcada como paga");
-        } else if (action === "reabrir") {
-          conta.valorPago = 0;
-          conta.status = "pendente";
-          toast("Conta reaberta");
-        } else if (action === "pagar-parcial") {
-          const v = Number(prompt(`Quanto pagar agora em "${conta.descricao}"? (em aberto: ${brl(conta.valorParcela - (conta.valorPago || 0))})`, "0"));
-          if (!Number.isFinite(v) || v <= 0) return;
-          conta.valorPago = Math.min(conta.valorParcela, (conta.valorPago || 0) + v);
-          conta.status = conta.valorPago >= conta.valorParcela ? "pago" : "pendente";
-          toast(`Pagamento parcial registrado`);
-        } else if (action === "editar") {
-          showForm(conta);
-          return;
-        } else if (action === "remover") {
-          if (!confirm(`Remover "${conta.descricao}"?`)) return;
-          state.contas = state.contas.filter((c) => c.id !== id);
-          toast("Conta removida");
-        }
-        saveState(); renderAll();
+  // Eventos por card de conta
+  document.querySelectorAll(".conta-card").forEach((card) => {
+    const contaId = card.getAttribute("data-conta");
+    const conta = state.contas.find((c) => c.id === contaId);
+    if (!conta) return;
+
+    card.querySelector("[data-act=add-item]")?.addEventListener("click", () => showFormItem(contaId, null));
+    card.querySelector("[data-act=edit-conta]")?.addEventListener("click", () => showFormConta(conta));
+    card.querySelector("[data-act=rm-conta]")?.addEventListener("click", () => {
+      if (!confirm(`Remover "${conta.descricao}" e todos os itens?`)) return;
+      state.contas = state.contas.filter((c) => c.id !== contaId);
+      saveState(); toast("Conta removida"); renderAll();
+    });
+
+    card.querySelectorAll("tr[data-item]").forEach((tr) => {
+      const itemId = tr.getAttribute("data-item");
+      const item = (conta.itens || []).find((i) => i.id === itemId);
+      if (!item) return;
+      tr.querySelectorAll("[data-act]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const act = btn.getAttribute("data-act");
+          if (act === "quit-item") {
+            item.valorPago = item.valorParcela;
+            toast("Item pago");
+          } else if (act === "reabrir-item") {
+            item.valorPago = 0;
+            toast("Item reaberto");
+          } else if (act === "parc-item") {
+            const aberto = Math.max(0, (item.valorParcela || 0) - (item.valorPago || 0));
+            const v = Number(prompt(`Quanto pagar agora em "${item.descricao}"? (em aberto: ${brl(aberto)})`, "0"));
+            if (!Number.isFinite(v) || v <= 0) return;
+            item.valorPago = Math.min(item.valorParcela, (item.valorPago || 0) + v);
+            toast("Pagamento parcial registrado");
+          } else if (act === "edit-item") {
+            showFormItem(contaId, item); return;
+          } else if (act === "rm-item") {
+            if (!confirm(`Remover "${item.descricao}"?`)) return;
+            conta.itens = conta.itens.filter((i) => i.id !== itemId);
+            toast("Item removido");
+          }
+          conta.status = valorAbertoConta(conta) === 0 ? "pago" : "pendente";
+          saveState(); renderAll();
+        });
       });
     });
   });
@@ -625,58 +856,98 @@ function renderCaixa(c) {
   const el = document.getElementById("caixa");
   const movEntradas = state.movimentacoes.filter((m) => m.tipo === "Entrada").slice(0, 30);
 
+  // Saldos calculados por fonte
+  const linhas = state.caixa.map((x) => ({
+    ...x,
+    saldoCalc: caixaSaldoCalculado(x),
+    base: x.valor || 0
+  }));
+
   el.innerHTML = `
     <section class="panel">
       <div class="panel-head">
         <div>
           <h2 class="panel-title">Fontes de caixa</h2>
-          <p class="panel-sub">Onde está o dinheiro hoje. Edite os valores diretamente.</p>
+          <p class="panel-sub">Saldo atualiza sozinho conforme você lança entradas e gastos</p>
         </div>
         <button class="btn" id="add-caixa">+ Adicionar local</button>
       </div>
 
+      <div class="kpi-grid">
+        <div class="kpi ok">
+          <h3>Total disponível</h3>
+          <div class="value pos">${brl(c.caixaTotal)}</div>
+          <div class="sub">Soma de todas as fontes</div>
+        </div>
+        ${linhas.slice(0, 3).map((l) => `
+          <div class="kpi" style="--conta-cor:${l.cor || "#2f7d32"}; border-left: 4px solid ${l.cor || "#2f7d32"};">
+            <h3>${escapeHtml(l.local)}</h3>
+            <div class="value">${brl(l.saldoCalc)}</div>
+            <div class="sub">base ${brl(l.base)}</div>
+          </div>`).join("")}
+      </div>
+
+      <div class="chart-grid">
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Distribuição do caixa</h2></div>
+          <div class="chart-box"><canvas id="chartCaixaPie"></canvas></div>
+        </article>
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Por local</h2></div>
+          <div class="chart-box"><canvas id="chartCaixaBar"></canvas></div>
+        </article>
+      </div>
+
       <form id="form-caixa" class="form-grid cols-caixa" style="display:none;">
         <input name="local" placeholder="Local (ex: Carteira, Inter)" required maxlength="40" />
-        <input name="valor" type="number" min="0" step="0.01" placeholder="Saldo" required />
+        <input name="valor" type="number" min="0" step="0.01" placeholder="Saldo inicial" required />
+        <input name="cor" type="color" value="#2f7d32" />
         <button class="btn" type="submit">Adicionar</button>
       </form>
 
       <div class="table-wrap" style="margin-top:10px;">
         <table>
-          <thead><tr><th>Local</th><th>Saldo</th><th></th></tr></thead>
+          <thead><tr><th>Cor</th><th>Local</th><th>Saldo calculado</th><th>Base</th><th></th></tr></thead>
           <tbody>
-            ${state.caixa.map((x) => `
+            ${linhas.map((x) => `
               <tr data-id="${x.id}">
+                <td><input type="color" class="inline-input" data-field="cor" value="${x.cor || "#2f7d32"}" style="padding:2px;" /></td>
                 <td><input class="inline-input" data-field="local" value="${escapeAttr(x.local)}" /></td>
-                <td><input class="inline-input" data-field="valor" type="number" step="0.01" value="${x.valor}" /></td>
+                <td class="num"><strong style="color:${x.cor || "#2f7d32"};">${brl(x.saldoCalc)}</strong></td>
+                <td><input class="inline-input" data-field="valor" type="number" step="0.01" value="${x.base}" title="Valor base — saldo final = base + entradas − gastos" /></td>
                 <td class="actions">
+                  <button class="btn sm ghost" data-action="ajustar" title="Definir saldo final">Ajustar</button>
                   <button class="btn sm danger" data-action="remover">×</button>
                 </td>
               </tr>`).join("")}
             <tr>
-              <td><strong>Total disponível</strong></td>
+              <td colspan="2"><strong>Total disponível</strong></td>
               <td class="num"><strong>${brl(c.caixaTotal)}</strong></td>
-              <td></td>
+              <td colspan="2"></td>
             </tr>
           </tbody>
         </table>
       </div>
+      <p class="hint">Lance entradas/gastos pelo formulário no Resumo — o saldo daqui atualiza automaticamente.</p>
     </section>
+
+    ${renderAReceber()}
 
     <section class="panel">
       <div class="panel-head">
         <h2 class="panel-title">Últimas entradas</h2>
-        <p class="panel-sub">Registros do tipo "Entrada"</p>
+        <p class="panel-sub">Registros do tipo "Entrada" com a fonte que recebeu</p>
       </div>
       ${movEntradas.length === 0 ? `<p class="muted">Nenhuma entrada registrada ainda.</p>` : `
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Fonte</th><th>Valor</th><th></th></tr></thead>
           <tbody>
             ${movEntradas.map((m) => `
               <tr data-mov="${m.id}">
                 <td>${fmtBR(m.data)}</td>
                 <td>${escapeHtml(m.descricao)}</td>
+                <td><span class="pill" style="background:${fonteCor(m.fonteId)};color:#fff;">${escapeHtml(fonteNome(m.fonteId))}</span></td>
                 <td class="num ok">+${brl(m.valor)}</td>
                 <td class="actions"><button class="btn sm danger" data-action="rm-mov">×</button></td>
               </tr>`).join("")}
@@ -695,8 +966,9 @@ function renderCaixa(c) {
     const fd = new FormData(e.currentTarget);
     const local = String(fd.get("local") || "").trim();
     const valor = Number(fd.get("valor") || 0);
+    const cor = fd.get("cor") || "#2f7d32";
     if (!local) return;
-    state.caixa.push({ id: uid(), local, valor });
+    state.caixa.push({ id: uid(), local, valor, cor });
     saveState(); toast("Local adicionado"); renderAll();
   });
 
@@ -712,6 +984,17 @@ function renderCaixa(c) {
         saveState(); renderAll();
       });
     });
+    tr.querySelector("[data-action=ajustar]")?.addEventListener("click", () => {
+      const item = state.caixa.find((x) => x.id === id);
+      if (!item) return;
+      const v = Number(prompt(`Saldo atual desejado em "${item.local}":`, caixaSaldoCalculado(item).toFixed(2)));
+      if (!Number.isFinite(v)) return;
+      const ajuste = sum(state.movimentacoes
+        .filter((m) => m.fonteId === item.id)
+        .map((m) => m.tipo === "Entrada" ? (m.valor || 0) : -(m.valor || 0)));
+      item.valor = v - ajuste;
+      saveState(); toast("Saldo ajustado"); renderAll();
+    });
     tr.querySelector("[data-action=remover]")?.addEventListener("click", () => {
       if (!confirm("Remover esse local?")) return;
       state.caixa = state.caixa.filter((x) => x.id !== id);
@@ -726,105 +1009,284 @@ function renderCaixa(c) {
       saveState(); toast("Entrada removida"); renderAll();
     });
   });
+
+  bindAReceber();
+  renderCaixaCharts(linhas);
+}
+
+function renderCaixaCharts(linhas) {
+  if (typeof Chart === "undefined") return;
+  ["chartCaixaPie", "chartCaixaBar"].forEach((k) => { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
+  const labels = linhas.map((l) => l.local);
+  const cores = linhas.map((l) => l.cor || "#2f7d32");
+  const dados = linhas.map((l) => Number(l.saldoCalc.toFixed(2)));
+  charts.chartCaixaPie = new Chart(document.getElementById("chartCaixaPie"), {
+    type: "doughnut",
+    data: { labels, datasets: [{ data: dados, backgroundColor: cores, borderWidth: 2, borderColor: "#fff" }] },
+    options: { cutout: "60%", maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } } }
+  });
+  charts.chartCaixaBar = new Chart(document.getElementById("chartCaixaBar"), {
+    type: "bar",
+    data: { labels, datasets: [{ label: "Saldo", data: dados, backgroundColor: cores, borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } } }
+  });
+}
+
+/* ---------- A RECEBER ---------- */
+
+function renderAReceber() {
+  const lista = state.aReceber || [];
+  const totalReceber = sum(lista.map((r) => {
+    const restantes = Math.max(0, (r.parcelasTotal || 0) - (r.parcelasRecebidas || 0));
+    return restantes * (r.valorParcela || 0);
+  }));
+
+  return `
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">A receber (parcelados)</h2>
+          <p class="panel-sub">Quem te deve em parcelas — ex: <em>Sr Carlos, 14×500, ainda 9 parcelas</em></p>
+        </div>
+        <button class="btn" id="add-receber">+ Adicionar</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi info">
+          <h3>Total a receber</h3>
+          <div class="value">${brl(totalReceber)}</div>
+          <div class="sub">${lista.length} dívida(s) ativa(s)</div>
+        </div>
+        ${lista.slice(0, 3).map((r) => {
+          const rest = Math.max(0, (r.parcelasTotal || 0) - (r.parcelasRecebidas || 0));
+          const totalRest = rest * (r.valorParcela || 0);
+          return `
+          <div class="kpi" style="border-left: 4px solid ${r.cor || "#3f51b5"};">
+            <h3>${escapeHtml(r.descricao)}</h3>
+            <div class="value">${brl(totalRest)}</div>
+            <div class="sub">${rest}/${r.parcelasTotal} parcelas restantes</div>
+          </div>`;
+        }).join("")}
+      </div>
+
+      <form id="form-receber" class="form-grid cols-receber" style="display:none;">
+        <input name="descricao" placeholder="De quem (ex: Sr Carlos - tinta)" required maxlength="60" />
+        <input name="parcelasTotal" type="number" min="1" step="1" placeholder="Total parc." required />
+        <input name="parcelasRecebidas" type="number" min="0" step="1" placeholder="Já recebeu" value="0" />
+        <input name="valorParcela" type="number" min="0.01" step="0.01" placeholder="Valor parcela" required />
+        <select name="fonteId" required>${fonteOptions()}</select>
+        <input name="cor" type="color" value="#3f51b5" />
+        <button class="btn" type="submit">Salvar</button>
+      </form>
+
+      ${lista.length === 0 ? `<p class="muted" style="margin-top:8px;">Nenhuma entrada parcelada cadastrada.</p>` : `
+      <div class="table-wrap" style="margin-top:10px;">
+        <table>
+          <thead><tr><th>De</th><th>Parcelas</th><th>Valor</th><th>Total dívida</th><th>Restante</th><th>Fonte</th><th></th></tr></thead>
+          <tbody>
+            ${lista.map((r) => {
+              const rest = Math.max(0, (r.parcelasTotal || 0) - (r.parcelasRecebidas || 0));
+              const totalRest = rest * (r.valorParcela || 0);
+              const totalGeral = (r.parcelasTotal || 0) * (r.valorParcela || 0);
+              return `
+                <tr data-receber="${r.id}">
+                  <td>
+                    <span class="conta-dot" style="--conta-cor:${r.cor || "#3f51b5"};"></span>
+                    <strong>${escapeHtml(r.descricao)}</strong>
+                  </td>
+                  <td><span class="pill">${r.parcelasRecebidas || 0}/${r.parcelasTotal}</span> · faltam <strong>${rest}</strong></td>
+                  <td class="num">${brl(r.valorParcela)}</td>
+                  <td class="num muted">${brl(totalGeral)}</td>
+                  <td class="num"><strong class="${rest > 0 ? "warn" : "ok"}">${brl(totalRest)}</strong></td>
+                  <td><span class="pill" style="background:${fonteCor(r.fonteId)};color:#fff;">${escapeHtml(fonteNome(r.fonteId))}</span></td>
+                  <td class="actions">
+                    <button class="btn sm success" data-act="receber">Recebi parcela</button>
+                    <button class="btn sm ghost" data-act="edit-receber">Editar</button>
+                    <button class="btn sm danger" data-act="rm-receber">×</button>
+                  </td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`}
+    </section>
+  `;
+}
+
+function bindAReceber() {
+  if (!state.aReceber) state.aReceber = [];
+  const form = document.getElementById("form-receber");
+  let editingId = null;
+
+  document.getElementById("add-receber").addEventListener("click", () => {
+    editingId = null;
+    form.reset();
+    form.cor.value = "#3f51b5";
+    form.parcelasRecebidas.value = 0;
+    form.style.display = form.style.display === "none" ? "grid" : "none";
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const data = {
+      descricao: String(fd.get("descricao") || "").trim(),
+      parcelasTotal: Number(fd.get("parcelasTotal") || 1),
+      parcelasRecebidas: Number(fd.get("parcelasRecebidas") || 0),
+      valorParcela: Number(fd.get("valorParcela") || 0),
+      fonteId: fd.get("fonteId"),
+      cor: fd.get("cor") || "#3f51b5"
+    };
+    if (!data.descricao || data.valorParcela <= 0) { toast("Preencha descrição e valor."); return; }
+    if (editingId) {
+      state.aReceber = state.aReceber.map((r) => r.id === editingId ? { ...r, ...data } : r);
+      toast("Atualizado");
+    } else {
+      state.aReceber.push({ id: uid(), ...data });
+      toast("Entrada parcelada cadastrada");
+    }
+    saveState(); form.style.display = "none"; renderAll();
+  });
+
+  document.querySelectorAll("#caixa tr[data-receber]").forEach((tr) => {
+    const id = tr.getAttribute("data-receber");
+    const r = state.aReceber.find((x) => x.id === id);
+    if (!r) return;
+    tr.querySelector("[data-act=receber]").addEventListener("click", () => {
+      if ((r.parcelasRecebidas || 0) >= r.parcelasTotal) { toast("Já recebeu todas"); return; }
+      r.parcelasRecebidas = (r.parcelasRecebidas || 0) + 1;
+      // Lança movimentação de entrada na fonte automaticamente
+      state.movimentacoes.unshift({
+        id: uid(),
+        tipo: "Entrada",
+        categoria: "",
+        data: todayISO(),
+        descricao: `${r.descricao} (parc. ${r.parcelasRecebidas}/${r.parcelasTotal})`,
+        valor: r.valorParcela,
+        fonteId: r.fonteId
+      });
+      saveState(); toast(`Parcela recebida em ${fonteNome(r.fonteId)}`); renderAll();
+    });
+    tr.querySelector("[data-act=edit-receber]").addEventListener("click", () => {
+      editingId = r.id;
+      form.descricao.value = r.descricao;
+      form.parcelasTotal.value = r.parcelasTotal;
+      form.parcelasRecebidas.value = r.parcelasRecebidas || 0;
+      form.valorParcela.value = r.valorParcela;
+      form.fonteId.value = r.fonteId;
+      form.cor.value = r.cor || "#3f51b5";
+      form.style.display = "grid";
+      form.scrollIntoView({ behavior: "smooth" });
+    });
+    tr.querySelector("[data-act=rm-receber]").addEventListener("click", () => {
+      if (!confirm(`Remover "${r.descricao}"?`)) return;
+      state.aReceber = state.aReceber.filter((x) => x.id !== id);
+      saveState(); renderAll();
+    });
+  });
 }
 
 /* ---------- RENDER: GASTOS ---------- */
 
 function renderGastos(c) {
   const el = document.getElementById("gastos");
+  const isCatExcluida = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
   const todosGastos = state.movimentacoes.filter((m) => m.tipo === "Gasto").sort((a, b) => (b.data || "").localeCompare(a.data || ""));
 
-  // gastos do mês atual de combustível e moto
+  // Dados pra gráfico no topo
   const ref = parseISO(state.referencia);
-  const noMes = (iso) => {
-    const d = parseISO(iso);
-    return d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
-  };
-  const totalMes = sum(todosGastos.filter((g) => noMes(g.data)).map((g) => g.valor));
-  const limitePessoal = sum(state.categorias.map((c) => c.meta));
-  const podeGastar = limitePessoal - totalMes;
-  const diasNoMes = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-  const hoje = ref.getDate();
-  const diasRestantes = Math.max(1, diasNoMes - hoje + 1);
-  const podePorDia = Math.max(0, podeGastar / diasRestantes);
+  const isCatComb = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
+  const gastosMes = state.movimentacoes.filter((m) => {
+    const d = parseISO(m.data);
+    return m.tipo === "Gasto" && !isCatComb(m.categoria) && d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
+  });
+  const porCat = {};
+  gastosMes.forEach((m) => { porCat[m.categoria || "Sem categoria"] = (porCat[m.categoria || "Sem categoria"] || 0) + m.valor; });
 
   el.innerHTML = `
     <section class="panel">
       <div class="panel-head">
         <div>
           <h2 class="panel-title">Tudo que gastei</h2>
-          <p class="panel-sub">Linha do tempo de gastos com data e categoria</p>
+          <p class="panel-sub">Linha do tempo · combustível tem aba própria e <em>não</em> entra no limite</p>
         </div>
       </div>
 
-      <form id="form-gasto" class="form-grid cols-mov">
+      <div class="kpi-grid">
+        <div class="kpi info">
+          <h3>Limite mensal</h3>
+          <div class="value">${brl(c.limiteMensal)}</div>
+          <div class="sub">Combustível separado</div>
+        </div>
+        <div class="kpi warn">
+          <h3>Gasto no mês</h3>
+          <div class="value neg">${brl(c.gastoLimite)}</div>
+          <div class="sub">${fmtPct(c.limiteMensal > 0 ? (c.gastoLimite / c.limiteMensal) * 100 : 0)} do limite</div>
+        </div>
+        <div class="kpi ${c.podeGastarMes < 0 ? "danger" : "ok"}">
+          <h3>Pode gastar</h3>
+          <div class="value ${c.podeGastarMes < 0 ? "neg" : "pos"}">${brl(Math.max(0, c.podeGastarMes))}</div>
+          <div class="sub">Restante até fim do mês</div>
+        </div>
+        <div class="kpi">
+          <h3>Por dia</h3>
+          <div class="value">${brl(podePorDiaMes(c))}</div>
+          <div class="sub">${diasRestantesNoMes()} dia(s) restantes</div>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Gastos por categoria (mês)</h2></div>
+          <div class="chart-box"><canvas id="chartGastosPie"></canvas></div>
+        </article>
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Categorias em barras</h2></div>
+          <div class="chart-box"><canvas id="chartGastosBar"></canvas></div>
+        </article>
+      </div>
+
+      <div class="alert ${c.podeGastarMes < 0 ? "danger" : "ok"}" style="margin-top:8px;">
+        <span class="icon">${c.podeGastarMes < 0 ? "🚨" : "💡"}</span>
+        <div>
+          ${c.podeGastarMes < 0
+            ? `Você passou ${brl(-c.podeGastarMes)} do seu limite mensal de ${brl(c.limiteMensal)}.`
+            : `Você gastou <strong>${brl(c.gastoLimite)}</strong>, ainda tem <strong>${brl(c.podeGastarMes)}</strong>. Pode gastar até <strong>${brl(podePorDiaMes(c))}/dia</strong> até o fim do mês.`}
+        </div>
+      </div>
+
+      <form id="form-gasto" class="form-grid cols-mov-fonte" style="margin-top:14px;">
         <select name="tipo"><option value="Gasto">Gasto</option></select>
+        <select name="fonteId">${fonteOptions()}</select>
         <select name="categoria" required>${categoriaOptions()}</select>
         <input name="data" type="date" required value="${state.referencia}" />
         <input name="descricao" required placeholder="Descrição (ex: miojo)" maxlength="60" />
         <input name="valor" type="number" min="0.01" step="0.01" required placeholder="Valor" />
         <button class="btn" type="submit">Lançar</button>
       </form>
-
-      <div class="kpi-grid" style="margin-top:14px;">
-        <div class="kpi info">
-          <h3>Limite mensal</h3>
-          <div class="value">${brl(limitePessoal)}</div>
-          <div class="sub">Soma das metas de categoria</div>
-        </div>
-        <div class="kpi warn">
-          <h3>Gasto no mês</h3>
-          <div class="value neg">${brl(totalMes)}</div>
-          <div class="sub">${fmtPct(limitePessoal > 0 ? (totalMes / limitePessoal) * 100 : 0)} do limite</div>
-        </div>
-        <div class="kpi ok">
-          <h3>Pode gastar</h3>
-          <div class="value ${podeGastar < 0 ? "neg" : "pos"}">${brl(Math.max(0, podeGastar))}</div>
-          <div class="sub">Restante até fim do mês</div>
-        </div>
-        <div class="kpi">
-          <h3>Por dia</h3>
-          <div class="value">${brl(podePorDia)}</div>
-          <div class="sub">${diasRestantes} dia(s) restantes</div>
-        </div>
-      </div>
-
-      <div class="alert ${podeGastar < 0 ? "danger" : "ok"}" style="margin-top:8px;">
-        <span class="icon">${podeGastar < 0 ? "🚨" : "💡"}</span>
-        <div>
-          ${podeGastar < 0
-            ? `Você passou ${brl(-podeGastar)} do seu limite mensal de ${brl(limitePessoal)}.`
-            : `Você gastou <strong>${brl(totalMes)}</strong>, ainda tem <strong>${brl(podeGastar)}</strong>. Pode gastar até <strong>${brl(podePorDia)}/dia</strong> até o fim do mês.`}
-        </div>
-      </div>
-    </section>
-
-    <section class="chart-grid">
-      <article class="panel">
-        <div class="panel-head"><h2 class="panel-title">Combustível & Moto (12 meses)</h2></div>
-        <div class="chart-box"><canvas id="chartMoto"></canvas></div>
-      </article>
-      <article class="panel">
-        <div class="panel-head"><h2 class="panel-title">Disponível por dia (mês)</h2></div>
-        <div class="chart-box"><canvas id="chartPodeGastar"></canvas></div>
-      </article>
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h2 class="panel-title">Histórico</h2></div>
+      <div class="panel-head"><h2 class="panel-title">Histórico de gastos</h2></div>
       ${todosGastos.length === 0 ? `<p class="muted">Sem gastos registrados.</p>` : `
       <div class="table-wrap">
         <table>
           <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
           <tbody>
-            ${todosGastos.slice(0, 80).map((m) => `
+            ${todosGastos.slice(0, 120).map((m) => {
+              const excluida = isCatExcluida(m.categoria);
+              return `
               <tr data-mov="${m.id}">
                 <td>${fmtBR(m.data)}</td>
-                <td><span class="pill">${escapeHtml(m.categoria || "—")}</span></td>
+                <td>
+                  <span class="pill" style="background:${corDaCategoria(m.categoria)};color:#fff;">${escapeHtml(m.categoria || "—")}</span>
+                  ${excluida ? `<span class="pill" title="Não conta no limite">fora do limite</span>` : ""}
+                </td>
                 <td>${escapeHtml(m.descricao)}</td>
                 <td class="num neg">−${brl(m.valor)}</td>
                 <td class="actions"><button class="btn sm danger" data-action="rm-mov">×</button></td>
-              </tr>`).join("")}
+              </tr>`;
+            }).join("")}
           </tbody>
         </table>
       </div>`}
@@ -839,7 +1301,8 @@ function renderGastos(c) {
       categoria: fd.get("categoria"),
       data: fd.get("data"),
       descricao: String(fd.get("descricao") || "").trim(),
-      valor: Number(fd.get("valor") || 0)
+      valor: Number(fd.get("valor") || 0),
+      fonteId: fd.get("fonteId")
     });
     e.currentTarget.reset();
     e.currentTarget.querySelector("[name=data]").value = state.referencia;
@@ -853,80 +1316,207 @@ function renderGastos(c) {
     });
   });
 
-  renderChartMoto();
-  renderChartPodeGastar(limitePessoal);
+  // Gráficos no topo da aba Gastos
+  if (typeof Chart !== "undefined") {
+    const labels = Object.keys(porCat);
+    const valores = labels.map((k) => Number(porCat[k].toFixed(2)));
+    const cores = labels.map((k) => corDaCategoria(k));
+    ["chartGastosPie", "chartGastosBar"].forEach((k) => { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
+    if (labels.length === 0) {
+      const ctx = document.getElementById("chartGastosPie").getContext("2d");
+      ctx.font = "14px Inter"; ctx.fillStyle = "#5c6b56";
+      ctx.fillText("Sem gastos no mês.", 20, 30);
+    } else {
+      charts.chartGastosPie = new Chart(document.getElementById("chartGastosPie"), {
+        type: "doughnut",
+        data: { labels, datasets: [{ data: valores, backgroundColor: cores, borderWidth: 2, borderColor: "#fff" }] },
+        options: { cutout: "60%", maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } } }
+      });
+      charts.chartGastosBar = new Chart(document.getElementById("chartGastosBar"), {
+        type: "bar",
+        data: { labels, datasets: [{ label: "Gasto", data: valores, backgroundColor: cores, borderRadius: 6 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } } }
+      });
+    }
+  }
 }
 
-function renderChartMoto() {
-  if (typeof Chart === "undefined") return;
+function corDaCategoria(nome) {
+  const c = state.categorias.find((x) => x.nome === nome);
+  return c?.cor || "#5c6b56";
+}
+
+/* ---------- RENDER: COMBUSTÍVEL ---------- */
+
+function renderCombustivel() {
+  const el = document.getElementById("combustivel");
+  // Considera tanto registros em state.gasolina quanto movimentos com categoria flagada como excluída
+  const isCatComb = (nome) => state.categorias.some((c) => c.nome === nome && c.excluirDoLimite);
+  const movsComb = state.movimentacoes
+    .filter((m) => m.tipo === "Gasto" && isCatComb(m.categoria))
+    .map((m) => ({ id: m.id, data: m.data, descricao: m.descricao, valor: m.valor, fonte: "mov" }));
+  const reg = (state.gasolina || []).map((g) => ({ id: g.id, data: g.data, descricao: g.descricao, valor: g.valor, fonte: "gas" }));
+  const todos = [...movsComb, ...reg].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+
+  // Agrupa por semana
+  const porSemana = {};
+  todos.forEach((g) => {
+    const k = isoWeekKey(parseISO(g.data));
+    if (!porSemana[k]) porSemana[k] = { total: 0, count: 0, semana: k, datas: [] };
+    porSemana[k].total += g.valor || 0;
+    porSemana[k].count += 1;
+    porSemana[k].datas.push(g.data);
+  });
+  const semanas = Object.values(porSemana).sort((a, b) => a.semana.localeCompare(b.semana));
+  const ultimas12 = semanas.slice(-12);
+
+  const totalGeral = sum(todos.map((g) => g.valor));
+  const mediaSemanal = semanas.length ? totalGeral / semanas.length : 0;
+  const ultima = semanas[semanas.length - 1];
+  const penult = semanas[semanas.length - 2];
+  const dif = (ultima && penult) ? ultima.total - penult.total : 0;
+  const pctDif = (penult && penult.total > 0) ? (dif / penult.total) * 100 : 0;
+  const tendencia = dif > 0 ? "subiu" : dif < 0 ? "caiu" : "estável";
+
+  // Mês de referência
   const ref = parseISO(state.referencia);
-  const meses = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
-    meses.push({ y: d.getFullYear(), m: d.getMonth(), label: `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}` });
-  }
-  const isCombustivel = (g) => /combust|gasolina/i.test(g.categoria || "") || /gasolin/i.test(g.descricao || "");
-  const isMoto = (g) => /moto|conserto|mecânic|mecanic|oficina/i.test(g.descricao || "");
-  const buckets = meses.map((mm) => ({ comb: 0, moto: 0 }));
-  state.movimentacoes.filter((m) => m.tipo === "Gasto").forEach((g) => {
+  const noMes = todos.filter((g) => {
     const d = parseISO(g.data);
-    const idx = meses.findIndex((mm) => mm.y === d.getFullYear() && mm.m === d.getMonth());
-    if (idx === -1) return;
-    if (isMoto(g)) buckets[idx].moto += g.valor;
-    if (isCombustivel(g)) buckets[idx].comb += g.valor;
+    return d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
   });
-  if (charts.chartMoto) charts.chartMoto.destroy();
-  charts.chartMoto = new Chart(document.getElementById("chartMoto"), {
-    type: "bar",
-    data: {
-      labels: meses.map((m) => m.label),
-      datasets: [
-        { label: "Combustível", data: buckets.map((b) => b.comb), backgroundColor: "#ff9800", borderRadius: 6 },
-        { label: "Conserto moto", data: buckets.map((b) => b.moto), backgroundColor: "#8d6e63", borderRadius: 6 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
-      scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } }
-    }
-  });
-}
+  const totalMes = sum(noMes.map((g) => g.valor));
 
-function renderChartPodeGastar(limite) {
-  if (typeof Chart === "undefined") return;
-  const ref = parseISO(state.referencia);
-  const diasNoMes = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-  const labels = [];
-  const linhaIdeal = [];
-  const linhaReal = [];
-  let acumulado = 0;
-  const idealPorDia = limite / diasNoMes;
-  for (let d = 1; d <= diasNoMes; d++) {
-    labels.push(String(d).padStart(2, "0"));
-    const dia = new Date(ref.getFullYear(), ref.getMonth(), d);
-    const iso = toISO(dia);
-    const gastoDoDia = sum(state.movimentacoes.filter((m) => m.tipo === "Gasto" && m.data === iso).map((m) => m.valor));
-    acumulado += gastoDoDia;
-    linhaReal.push(Math.max(0, limite - acumulado));
-    linhaIdeal.push(Math.max(0, limite - idealPorDia * d));
-  }
-  if (charts.chartPodeGastar) charts.chartPodeGastar.destroy();
-  charts.chartPodeGastar = new Chart(document.getElementById("chartPodeGastar"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Disponível real", data: linhaReal, borderColor: "#2f7d32", backgroundColor: "rgba(47,125,50,0.12)", fill: true, tension: 0.3, pointRadius: 0 },
-        { label: "Ritmo ideal", data: linhaIdeal, borderColor: "#90a4ae", borderDash: [5, 5], fill: false, pointRadius: 0 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
-      scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } }
-    }
+  el.innerHTML = `
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Combustível</h2>
+          <p class="panel-sub">Monitora apenas — não entra no seu limite mensal de gastos</p>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi info">
+          <h3>No mês</h3>
+          <div class="value">${brl(totalMes)}</div>
+          <div class="sub">${noMes.length} abastecimento(s)</div>
+        </div>
+        <div class="kpi">
+          <h3>Média semanal</h3>
+          <div class="value">${brl(mediaSemanal)}</div>
+          <div class="sub">Histórico de ${semanas.length} semana(s)</div>
+        </div>
+        <div class="kpi ${dif > 0 ? "warn" : dif < 0 ? "ok" : ""}">
+          <h3>Última semana</h3>
+          <div class="value">${ultima ? brl(ultima.total) : brl(0)}</div>
+          <div class="sub">
+            ${penult ? `${tendencia === "subiu" ? "▲" : tendencia === "caiu" ? "▼" : "•"} ${tendencia} ${brl(Math.abs(dif))} (${pctDif >= 0 ? "+" : ""}${pctDif.toFixed(1)}%) vs anterior` : "Sem comparativo ainda"}
+          </div>
+        </div>
+        <div class="kpi">
+          <h3>Total geral</h3>
+          <div class="value">${brl(totalGeral)}</div>
+          <div class="sub">Todos os registros</div>
+        </div>
+      </div>
+
+      <div class="alert ${dif > 0 ? "warn" : dif < 0 ? "ok" : ""}">
+        <span class="icon">${dif > 0 ? "⛽" : dif < 0 ? "🟢" : "ℹ️"}</span>
+        <div>
+          ${penult ? (
+            dif > 0
+              ? `O gasto de combustível <strong>aumentou ${brl(dif)}</strong> em relação à semana anterior. Atenção pra não estourar.`
+              : dif < 0
+                ? `Você <strong>economizou ${brl(-dif)}</strong> em combustível esta semana. Boa.`
+                : `Gasto estável em relação à semana anterior.`
+          ) : `Registre pelo menos duas semanas pra começar a comparar a tendência.`}
+        </div>
+      </div>
+
+      <form id="form-combustivel" class="form-grid cols-gasolina" style="margin-top:8px;">
+        <input name="data" type="date" required value="${state.referencia}" />
+        <input name="descricao" placeholder="Descrição (ex: posto Shell)" maxlength="50" />
+        <input name="valor" type="number" min="0.01" step="0.01" required placeholder="Valor" />
+        <button class="btn" type="submit">Registrar abastecimento</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Tendência semanal (últimas 12 semanas)</h2>
+      </div>
+      <div class="chart-box"><canvas id="chartCombSem"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Histórico</h2>
+        <p class="panel-sub">Todos os abastecimentos — mais recente primeiro</p>
+      </div>
+      ${todos.length === 0 ? `<p class="muted">Nenhum registro ainda.</p>` : `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Data</th><th>Semana</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+          <tbody>
+            ${todos.slice().reverse().slice(0, 80).map((g) => `
+              <tr data-id="${g.id}" data-fonte="${g.fonte}">
+                <td>${fmtBR(g.data)}</td>
+                <td><span class="pill">${isoWeekKey(parseISO(g.data))}</span></td>
+                <td>${escapeHtml(g.descricao || "—")}</td>
+                <td class="num">${brl(g.valor)}</td>
+                <td class="actions"><button class="btn sm danger" data-action="rm-comb">×</button></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`}
+    </section>
+  `;
+
+  document.getElementById("form-combustivel").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    if (!state.gasolina) state.gasolina = [];
+    state.gasolina.push({
+      id: uid(),
+      data: fd.get("data") || todayISO(),
+      descricao: String(fd.get("descricao") || "").trim(),
+      valor: Number(fd.get("valor") || 0)
+    });
+    saveState(); toast("Abastecimento registrado"); renderAll();
   });
+
+  document.querySelectorAll("#combustivel tr[data-id]").forEach((tr) => {
+    tr.querySelector("[data-action=rm-comb]").addEventListener("click", () => {
+      const id = tr.getAttribute("data-id");
+      const fonte = tr.getAttribute("data-fonte");
+      if (fonte === "gas") state.gasolina = state.gasolina.filter((x) => x.id !== id);
+      else state.movimentacoes = state.movimentacoes.filter((x) => x.id !== id);
+      saveState(); toast("Removido"); renderAll();
+    });
+  });
+
+  // Gráfico tendência semanal
+  if (typeof Chart !== "undefined") {
+    if (charts.chartCombSem) charts.chartCombSem.destroy();
+    const labels = ultimas12.map((s) => s.semana.replace(/^\d{4}-/, ""));
+    const dados = ultimas12.map((s) => Number(s.total.toFixed(2)));
+    const cor = (i) => i === ultimas12.length - 1 ? "#ff9800" : "#ffcc80";
+    charts.chartCombSem = new Chart(document.getElementById("chartCombSem"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Gasto na semana", data: dados, backgroundColor: dados.map((_, i) => cor(i)), borderRadius: 6 },
+          { label: "Média", type: "line", data: dados.map(() => mediaSemanal), borderColor: "#2f7d32", borderDash: [5, 5], pointRadius: 0, fill: false }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } }
+      }
+    });
+  }
 }
 
 /* ---------- RENDER: META UBER/99 ---------- */
@@ -992,14 +1582,6 @@ function renderMeta(c) {
         </div>
       </div>
 
-      <form id="form-uber" class="form-grid cols-meta">
-        <input name="data" type="date" required value="${state.referencia}" />
-        <input name="uber" type="number" min="0" step="0.01" placeholder="Uber" required />
-        <input name="app99" type="number" min="0" step="0.01" placeholder="99" required />
-        <button class="btn" type="submit">Salvar dia</button>
-      </form>
-      <p class="hint">Lança o ganho do dia. Se já existir, será atualizado.</p>
-
       <div class="chart-grid" style="margin-top:14px;">
         <article class="panel tight">
           <div class="panel-head"><h2 class="panel-title">Por dia (mês atual)</h2></div>
@@ -1030,6 +1612,14 @@ function renderMeta(c) {
           </div>`}
         </article>
       </div>
+
+      <form id="form-uber" class="form-grid cols-meta" style="margin-top:14px;">
+        <input name="data" type="date" required value="${state.referencia}" />
+        <input name="uber" type="number" min="0" step="0.01" placeholder="Uber" required />
+        <input name="app99" type="number" min="0" step="0.01" placeholder="99" required />
+        <button class="btn" type="submit">Salvar dia</button>
+      </form>
+      <p class="hint">Lança o ganho do dia. Se já existir, será atualizado.</p>
     </section>
   `;
 
@@ -1163,6 +1753,17 @@ function renderReserva() {
       <div class="progress" style="height:14px;"><div class="fill ${pct >= 100 ? "" : pct < 30 ? "warn" : ""}" style="width:${pct}%"></div></div>
       <p class="hint">A barra mostra o quanto você guardou no mês em relação à meta.</p>
 
+      <div class="chart-grid">
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Evolução do cofrinho</h2></div>
+          <div class="chart-box"><canvas id="chartReservaLinha"></canvas></div>
+        </article>
+        <article class="panel tight">
+          <div class="panel-head"><h2 class="panel-title" style="font-size:0.95rem;">Depósitos × Saques</h2></div>
+          <div class="chart-box"><canvas id="chartReservaBar"></canvas></div>
+        </article>
+      </div>
+
       <div class="panel-head" style="margin-top:18px;">
         <div>
           <h2 class="panel-title" style="font-size:0.95rem;">Registrar movimento no cofrinho</h2>
@@ -1234,15 +1835,6 @@ function renderReserva() {
       </div>`}
     </section>
 
-    <section class="panel">
-      <div class="panel-head">
-        <div>
-          <h2 class="panel-title">Gasolina semanal</h2>
-          <p class="panel-sub">Registros separados — cálculo de média por semana</p>
-        </div>
-      </div>
-      ${renderGasolina()}
-    </section>
   `;
 
   document.getElementById("res-valor").addEventListener("change", (e) => {
@@ -1296,83 +1888,32 @@ function renderReserva() {
     });
   });
 
-  bindGasolina();
-}
+  // Gráficos
+  if (typeof Chart !== "undefined") {
+    ["chartReservaLinha", "chartReservaBar"].forEach((k) => { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
+    const ord = (state.reservaMovs || []).slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    const labels = ord.map((m) => fmtBR(m.data).slice(0, 5));
+    let acc = 0;
+    const linha = ord.map((m) => { acc += m.tipo === "deposito" ? (m.valor || 0) : -(m.valor || 0); return Number(acc.toFixed(2)); });
 
-function renderGasolina() {
-  const ref = parseISO(state.referencia);
-  const lista = state.gasolina
-    .filter((g) => {
-      const d = parseISO(g.data);
-      return d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
-    })
-    .sort((a, b) => a.data.localeCompare(b.data));
-
-  const porSemana = {};
-  lista.forEach((g) => {
-    const k = isoWeekKey(parseISO(g.data));
-    porSemana[k] = (porSemana[k] || 0) + (g.valor || 0);
-  });
-  const semanas = Object.entries(porSemana);
-  const media = semanas.length ? sum(semanas.map(([, v]) => v)) / semanas.length : 0;
-  const totalMes = sum(lista.map((g) => g.valor || 0));
-
-  return `
-    <div class="kpi-grid">
-      <div class="kpi info">
-        <h3>Total no mês</h3>
-        <div class="value">${brl(totalMes)}</div>
-      </div>
-      <div class="kpi">
-        <h3>Média por semana</h3>
-        <div class="value">${brl(media)}</div>
-        <div class="sub">${semanas.length} semana(s) com registro</div>
-      </div>
-    </div>
-    <form id="form-gasolina" class="form-grid cols-gasolina">
-      <input name="data" type="date" required value="${state.referencia}" />
-      <input name="descricao" placeholder="Descrição (ex: posto Shell)" maxlength="50" />
-      <input name="valor" type="number" min="0.01" step="0.01" placeholder="Valor" required />
-      <button class="btn" type="submit">Adicionar</button>
-    </form>
-    ${lista.length === 0 ? `<p class="muted" style="margin-top:8px;">Nenhum abastecimento neste mês.</p>` : `
-    <div class="table-wrap" style="margin-top:8px;">
-      <table>
-        <thead><tr><th>Data</th><th>Semana</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
-        <tbody>
-          ${lista.map((g) => `
-            <tr data-id="${g.id}">
-              <td>${fmtBR(g.data)}</td>
-              <td><span class="pill">${isoWeekKey(parseISO(g.data))}</span></td>
-              <td>${escapeHtml(g.descricao || "—")}</td>
-              <td class="num">${brl(g.valor)}</td>
-              <td class="actions"><button class="btn sm danger" data-action="rm-gas">×</button></td>
-            </tr>`).join("")}
-        </tbody>
-      </table>
-    </div>`}
-  `;
-}
-
-function bindGasolina() {
-  document.getElementById("form-gasolina")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    state.gasolina.push({
-      id: uid(),
-      data: fd.get("data"),
-      descricao: String(fd.get("descricao") || "").trim(),
-      valor: Number(fd.get("valor") || 0)
+    charts.chartReservaLinha = new Chart(document.getElementById("chartReservaLinha"), {
+      type: "line",
+      data: { labels, datasets: [{ label: "Saldo", data: linha, borderColor: "#3f51b5", backgroundColor: "rgba(63,81,181,0.15)", fill: true, tension: 0.3, pointRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } } }
     });
-    saveState(); toast("Abastecimento registrado"); renderAll();
-  });
-  document.querySelectorAll("#reserva tr[data-id]").forEach((tr) => {
-    tr.querySelector("[data-action=rm-gas]")?.addEventListener("click", () => {
-      const id = tr.getAttribute("data-id");
-      state.gasolina = state.gasolina.filter((x) => x.id !== id);
-      saveState(); renderAll();
+    charts.chartReservaBar = new Chart(document.getElementById("chartReservaBar"), {
+      type: "bar",
+      data: {
+        labels: ["Depósitos", "Saques", "Saldo"],
+        datasets: [{
+          data: [Number(totalDepositos.toFixed(2)), Number(totalSaques.toFixed(2)), Number(saldoCofrinho.toFixed(2))],
+          backgroundColor: ["#43a047", "#e53935", "#3f51b5"],
+          borderRadius: 6
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } } }
     });
-  });
+  }
 }
 
 /* ---------- RENDER: CONFIG / CATEGORIAS ---------- */
@@ -1388,22 +1929,23 @@ function renderConfig() {
         </div>
       </div>
 
+      <p class="hint" style="margin-top:0;">As categorias servem só pra organizar gastos. O limite mensal é único (<strong>${brl(state.config.limiteMensal)}</strong>). Marque <strong>"Fora do limite"</strong> em categorias como <em>Combustível</em> que devem ficar separadas.</p>
+
       <form id="form-categoria" class="form-grid cols-categoria">
         <input name="nome" placeholder="Nome da categoria (ex: Lazer)" required maxlength="40" />
-        <input name="meta" type="number" min="0" step="1" placeholder="Meta mensal" required />
         <input name="cor" type="color" value="#2f7d32" />
         <button class="btn" type="submit">Adicionar categoria</button>
       </form>
 
       <div class="table-wrap" style="margin-top:12px;">
         <table>
-          <thead><tr><th>Cor</th><th>Nome</th><th>Meta mensal</th><th></th></tr></thead>
+          <thead><tr><th>Cor</th><th>Nome</th><th>Fora do limite</th><th></th></tr></thead>
           <tbody>
             ${state.categorias.map((c) => `
               <tr data-id="${c.id}">
                 <td><input type="color" data-field="cor" value="${c.cor || "#2f7d32"}" /></td>
                 <td><input class="inline-input" data-field="nome" value="${escapeAttr(c.nome)}" /></td>
-                <td><input class="inline-input" data-field="meta" type="number" step="1" value="${c.meta}" /></td>
+                <td><label style="display:inline-flex; align-items:center; gap:6px;"><input type="checkbox" data-field="excluirDoLimite" ${c.excluirDoLimite ? "checked" : ""} /> <span class="muted">não conta no R$ ${state.config.limiteMensal}</span></label></td>
                 <td class="actions"><button class="btn sm danger" data-action="rm-cat">×</button></td>
               </tr>`).join("")}
           </tbody>
@@ -1416,7 +1958,11 @@ function renderConfig() {
         <h2 class="panel-title">Configurações</h2>
         <p class="panel-sub">Ajuste fino do painel</p>
       </div>
-      <div class="form-grid cols-categoria">
+      <div class="form-grid cols-mov">
+        <label>
+          <span class="label">Limite mensal (R$)</span>
+          <input type="number" id="cfg-limite" min="0" step="10" value="${state.config.limiteMensal}" />
+        </label>
         <label>
           <span class="label">Dia de fechamento</span>
           <input type="number" id="cfg-fechamento" min="1" max="31" step="1" value="${state.config.fechamentoDia}" />
@@ -1425,6 +1971,7 @@ function renderConfig() {
           <span class="label">Meta Uber/99 diária</span>
           <input type="number" id="cfg-meta-uber" min="0" step="1" value="${state.config.metaUberDiaria}" />
         </label>
+        <span></span><span></span>
         <label>
           <span class="label">Limpar tudo</span>
           <button class="btn danger" id="reset-all">Resetar dados</button>
@@ -1438,7 +1985,7 @@ function renderConfig() {
     const fd = new FormData(e.currentTarget);
     const nome = String(fd.get("nome") || "").trim();
     if (!nome) return;
-    state.categorias.push({ id: uid(), nome, meta: Number(fd.get("meta") || 0), cor: fd.get("cor") || "#2f7d32" });
+    state.categorias.push({ id: uid(), nome, cor: fd.get("cor") || "#2f7d32", excluirDoLimite: false });
     saveState(); toast("Categoria criada"); renderAll();
   });
 
@@ -1449,7 +1996,8 @@ function renderConfig() {
         const cat = state.categorias.find((c) => c.id === id);
         if (!cat) return;
         const f = inp.getAttribute("data-field");
-        cat[f] = f === "meta" ? (Number(inp.value) || 0) : inp.value;
+        if (f === "excluirDoLimite") cat[f] = inp.checked;
+        else cat[f] = inp.value;
         saveState(); renderAll();
       });
     });
@@ -1460,6 +2008,10 @@ function renderConfig() {
     });
   });
 
+  document.getElementById("cfg-limite").addEventListener("change", (e) => {
+    state.config.limiteMensal = Number(e.target.value) || 500;
+    saveState(); renderAll();
+  });
   document.getElementById("cfg-fechamento").addEventListener("change", (e) => {
     state.config.fechamentoDia = Math.min(31, Math.max(1, Number(e.target.value) || 10));
     saveState(); renderAll();
@@ -1507,6 +2059,7 @@ function renderAll() {
   renderContas(c);
   renderCaixa(c);
   renderGastos(c);
+  renderCombustivel();
   renderMeta(c);
   renderReserva();
   renderConfig();

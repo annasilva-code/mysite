@@ -155,9 +155,42 @@ input:focus, select:focus, textarea:focus {
 .form-grid.cols-mov {
   grid-template-columns: 130px 160px 150px 1fr 130px 130px;
 }
-.form-grid.cols-conta {
-  grid-template-columns: 1fr 140px 140px 90px 90px 130px 110px 110px;
+.form-grid.cols-mov-fonte {
+  grid-template-columns: 110px 150px 150px 140px 1fr 120px 120px;
 }
+.form-grid.cols-receber {
+  grid-template-columns: 1fr 110px 110px 130px 140px 120px 120px;
+}
+.form-grid.cols-conta-item {
+  grid-template-columns: 1fr 90px 90px 130px 110px 110px;
+}
+.form-grid.cols-conta {
+  grid-template-columns: 1fr 140px 160px 70px 130px;
+}
+
+/* CONTAS GRID — cards coloridos por conta */
+.contas-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
+.conta-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 5px solid var(--conta-cor, var(--accent));
+  border-radius: var(--radius); padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.conta-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.conta-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 1.05rem; }
+.conta-title strong { letter-spacing: -0.01em; }
+.conta-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--conta-cor, var(--accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--conta-cor, var(--accent)) 25%, transparent);
+}
+.conta-meta { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
+.conta-itens { margin-top: 10px; }
+.conta-itens table { font-size: 0.88rem; min-width: 480px; }
+.conta-foot { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .form-grid.cols-categoria {
   grid-template-columns: 1fr 140px 140px;
 }
