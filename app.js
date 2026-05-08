@@ -145,6 +145,40 @@ function diasRestantesNoMes() {
 function podePorDiaMes(c) {
   return Math.max(0, c.podeGastarMes / diasRestantesNoMes());
 }
+
+/**
+ * Calcula a cota diária dinâmica:
+ *  - Cota base = limite ÷ dias do mês (ex: 500/30 = 16,67)
+ *  - Cota de hoje (dinâmica) = (limite - gasto até ontem) ÷ dias restantes (com hoje)
+ *  - Quanto menos gasta, mais sobra → a cota cresce
+ *  - Verde: gasto de hoje ≤ cota dinâmica · Vermelho: passou
+ */
+function cotaDiariaInfo(c) {
+  const ref = parseISO(state.referencia);
+  const ano = ref.getFullYear();
+  const mes = ref.getMonth();
+  const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+  const cotaBase = c.limiteMensal / diasNoMes;
+
+  const isCatExcluida = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
+  const noMes = (m) => {
+    const d = parseISO(m.data);
+    return m.tipo === "Gasto" && !isCatExcluida(m.categoria) && d.getMonth() === mes && d.getFullYear() === ano;
+  };
+  const hoje = state.referencia;
+  const gastoHoje = sum(state.movimentacoes.filter((m) => noMes(m) && m.data === hoje).map((m) => m.valor));
+  const gastoAteOntem = sum(state.movimentacoes.filter((m) => noMes(m) && m.data < hoje).map((m) => m.valor));
+  const diasRest = diasRestantesNoMes();
+  const cotaHoje = Math.max(0, (c.limiteMensal - gastoAteOntem) / diasRest);
+  const sobraHoje = cotaHoje - gastoHoje;
+  const ok = sobraHoje >= 0;
+
+  // Projeção pra amanhã: se ele não gastar mais hoje, qual será a cota
+  const diasRestAmanha = Math.max(1, diasRest - 1);
+  const projecaoAmanha = diasRestAmanha > 0 ? Math.max(0, (c.limiteMensal - gastoAteOntem - gastoHoje) / diasRestAmanha) : 0;
+
+  return { cotaBase, cotaHoje, gastoHoje, sobraHoje, ok, diasNoMes, diasRest, projecaoAmanha, gastoAteOntem };
+}
 function diasAteFechamento() {
   const ref = parseISO(state.referencia);
   const fechamento = new Date(ref.getFullYear(), ref.getMonth(), state.config.fechamentoDia);
@@ -248,6 +282,7 @@ function renderDashboard(c) {
   const el = document.getElementById("dashboard");
   const dCls = c.deficit > 0 ? "danger" : "ok";
   const dLabel = c.deficit > 0 ? `Faltam ${brl(c.deficit)}` : `Sobra ${brl(-c.deficit)}`;
+  const cota = cotaDiariaInfo(c);
 
   el.innerHTML = `
     <section class="panel">
@@ -349,15 +384,31 @@ function renderDashboard(c) {
           <div class="value ${c.podeGastarMes < 0 ? "neg" : "pos"}">${brl(Math.max(0, c.podeGastarMes))}</div>
           <div class="sub">${c.podeGastarMes < 0 ? "Passou do limite" : "Restante do mês"}</div>
         </div>
-        <div class="kpi">
-          <h3>Por dia</h3>
-          <div class="value">${brl(podePorDiaMes(c))}</div>
-          <div class="sub">${diasRestantesNoMes()} dia(s) restantes</div>
+        <div class="kpi ${cota.ok ? "ok" : "danger"}">
+          <h3>Cota de hoje</h3>
+          <div class="value ${cota.ok ? "pos" : "neg"}">${brl(cota.cotaHoje)}</div>
+          <div class="sub">${cota.ok
+            ? `gastou ${brl(cota.gastoHoje)} · sobra ${brl(cota.sobraHoje)}`
+            : `passou ${brl(-cota.sobraHoje)} da cota de hoje`}</div>
         </div>
       </div>
 
       <div class="progress" style="height:14px;"><div class="fill ${c.gastoLimite >= c.limiteMensal ? "over" : c.gastoLimite >= c.limiteMensal * 0.8 ? "warn" : ""}" style="width:${Math.min(100, (c.gastoLimite / Math.max(1, c.limiteMensal)) * 100)}%"></div></div>
-      <p class="hint">Esse painel já desconta combustível — você vê na aba <strong>Combustível</strong>.</p>
+
+      <div class="alert ${cota.ok ? "ok" : "danger"}" style="margin-top:10px;">
+        <span class="icon">${cota.ok ? "🟢" : "🔴"}</span>
+        <div>
+          ${cota.ok
+            ? `<strong>Hoje você está no verde.</strong> Sua cota é <strong>${brl(cota.cotaHoje)}</strong> e você gastou ${brl(cota.gastoHoje)}. Se não gastar mais hoje, amanhã sua cota sobe pra <strong>${brl(cota.projecaoAmanha)}/dia</strong>.`
+            : `<strong>Você ultrapassou a cota de hoje em ${brl(-cota.sobraHoje)}.</strong> Os próximos dias vão ter cota menor: agora <strong>${brl(cota.projecaoAmanha)}/dia</strong> em vez de ${brl(cota.cotaBase)}.`}
+        </div>
+      </div>
+
+      <p class="hint" style="margin-top:6px;">
+        <strong>Como funciona:</strong> ${brl(c.limiteMensal)} ÷ ${cota.diasNoMes} dias = ${brl(cota.cotaBase)}/dia base.
+        Cada dia que você gasta menos, a cota dos próximos dias <strong>aumenta</strong>. Cada dia que ultrapassa, a cota dos próximos dias <strong>diminui</strong>.
+        Combustível não conta.
+      </p>
     </section>
 
     <section class="chart-grid">
@@ -1192,6 +1243,7 @@ function renderGastos(c) {
   const el = document.getElementById("gastos");
   const isCatExcluida = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
   const todosGastos = state.movimentacoes.filter((m) => m.tipo === "Gasto").sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+  const cota = cotaDiariaInfo(c);
 
   // Dados pra gráfico no topo
   const ref = parseISO(state.referencia);
@@ -1228,10 +1280,12 @@ function renderGastos(c) {
           <div class="value ${c.podeGastarMes < 0 ? "neg" : "pos"}">${brl(Math.max(0, c.podeGastarMes))}</div>
           <div class="sub">Restante até fim do mês</div>
         </div>
-        <div class="kpi">
-          <h3>Por dia</h3>
-          <div class="value">${brl(podePorDiaMes(c))}</div>
-          <div class="sub">${diasRestantesNoMes()} dia(s) restantes</div>
+        <div class="kpi ${cota.ok ? "ok" : "danger"}">
+          <h3>Cota de hoje</h3>
+          <div class="value ${cota.ok ? "pos" : "neg"}">${brl(cota.cotaHoje)}</div>
+          <div class="sub">${cota.ok
+            ? `gastou ${brl(cota.gastoHoje)} · sobra ${brl(cota.sobraHoje)}`
+            : `passou ${brl(-cota.sobraHoje)} da cota`}</div>
         </div>
       </div>
 
@@ -1246,14 +1300,20 @@ function renderGastos(c) {
         </article>
       </div>
 
-      <div class="alert ${c.podeGastarMes < 0 ? "danger" : "ok"}" style="margin-top:8px;">
-        <span class="icon">${c.podeGastarMes < 0 ? "🚨" : "💡"}</span>
+      <div class="alert ${cota.ok && c.podeGastarMes >= 0 ? "ok" : "danger"}" style="margin-top:8px;">
+        <span class="icon">${cota.ok && c.podeGastarMes >= 0 ? "🟢" : "🔴"}</span>
         <div>
           ${c.podeGastarMes < 0
-            ? `Você passou ${brl(-c.podeGastarMes)} do seu limite mensal de ${brl(c.limiteMensal)}.`
-            : `Você gastou <strong>${brl(c.gastoLimite)}</strong>, ainda tem <strong>${brl(c.podeGastarMes)}</strong>. Pode gastar até <strong>${brl(podePorDiaMes(c))}/dia</strong> até o fim do mês.`}
+            ? `Você passou <strong>${brl(-c.podeGastarMes)}</strong> do limite mensal de ${brl(c.limiteMensal)}.`
+            : cota.ok
+              ? `Hoje você está <strong>no verde</strong>. Cota: ${brl(cota.cotaHoje)} · gastou: ${brl(cota.gastoHoje)} · sobra: <strong>${brl(cota.sobraHoje)}</strong>. Se segurar hoje, amanhã sua cota vira <strong>${brl(cota.projecaoAmanha)}/dia</strong>.`
+              : `Hoje você passou <strong>${brl(-cota.sobraHoje)}</strong> da cota (${brl(cota.cotaHoje)}). A partir de amanhã sua cota cai pra <strong>${brl(cota.projecaoAmanha)}/dia</strong> pra recuperar o equilíbrio.`}
         </div>
       </div>
+      <p class="hint" style="margin-top:0;">
+        <strong>Como funciona:</strong> ${brl(c.limiteMensal)} ÷ ${cota.diasNoMes} dias = ${brl(cota.cotaBase)}/dia base.
+        Economizou hoje? A cota dos próximos dias <strong>aumenta</strong>. Passou da cota? Os próximos dias <strong>diminuem</strong> automaticamente.
+      </p>
 
       <form id="form-gasto" class="form-grid cols-mov-fonte" style="margin-top:14px;">
         <select name="tipo"><option value="Gasto">Gasto</option></select>
