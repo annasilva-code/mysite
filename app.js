@@ -89,29 +89,68 @@ const DEFAULT_STATE = {
 let state = clone(DEFAULT_STATE);
 let charts = {};
 
-/* Defaults globais Chart.js — sincronizados com o tema */
+/* Defaults globais Chart.js — minimalismo editorial */
 function applyChartTheme() {
   if (typeof Chart === "undefined") return;
   const cs = getComputedStyle(document.documentElement);
-  const muted = cs.getPropertyValue("--muted").trim() || "#8aa0c0";
-  const text = cs.getPropertyValue("--text-strong").trim() || "#ffffff";
-  const grid = cs.getPropertyValue("--chart-grid").trim() || "rgba(255,255,255,0.06)";
-  const tipBg = cs.getPropertyValue("--tooltip-bg").trim() || "rgba(20, 39, 71, 0.95)";
-  const tipTitle = cs.getPropertyValue("--tooltip-title").trim() || "#ffffff";
-  const tipBody = cs.getPropertyValue("--tooltip-text").trim() || "#f4f7fb";
+  const muted = cs.getPropertyValue("--muted").trim() || "#9a9489";
+  const text = cs.getPropertyValue("--text-strong").trim() || "#0a0908";
+  const grid = cs.getPropertyValue("--chart-grid").trim() || "rgba(29,27,22,0.06)";
+  const tipBg = cs.getPropertyValue("--tooltip-bg").trim() || "rgba(28,26,23,0.98)";
+  const tipTitle = cs.getPropertyValue("--tooltip-title").trim() || "#f8f5ee";
+  const tipBody = cs.getPropertyValue("--tooltip-text").trim() || "#e8e4dc";
+  const border = cs.getPropertyValue("--border").trim() || "rgba(0,0,0,0.08)";
 
   Chart.defaults.color = muted;
   Chart.defaults.borderColor = grid;
-  Chart.defaults.font.family = '"Inter", "Segoe UI", sans-serif';
-  Chart.defaults.font.size = 12;
+  Chart.defaults.font.family = '"Geist", "Inter", system-ui, sans-serif';
+  Chart.defaults.font.size = 11;
+  Chart.defaults.font.weight = 500;
   Chart.defaults.plugins.legend.labels.color = text;
+  Chart.defaults.plugins.legend.labels.boxWidth = 8;
+  Chart.defaults.plugins.legend.labels.boxHeight = 8;
+  Chart.defaults.plugins.legend.labels.padding = 14;
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
   Chart.defaults.plugins.tooltip.backgroundColor = tipBg;
   Chart.defaults.plugins.tooltip.titleColor = tipTitle;
   Chart.defaults.plugins.tooltip.bodyColor = tipBody;
-  Chart.defaults.plugins.tooltip.borderColor = "rgba(74, 222, 128, 0.3)";
+  Chart.defaults.plugins.tooltip.borderColor = border;
   Chart.defaults.plugins.tooltip.borderWidth = 1;
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 6;
+  Chart.defaults.plugins.tooltip.titleFont = { weight: 600, size: 11 };
+  Chart.defaults.plugins.tooltip.bodyFont = { weight: 500, size: 11 };
+  Chart.defaults.plugins.tooltip.displayColors = false;
+  Chart.defaults.elements.bar.borderRadius = 3;
+  Chart.defaults.elements.bar.borderSkipped = false;
+  Chart.defaults.elements.line.tension = 0.35;
+  Chart.defaults.elements.line.borderWidth = 2;
+  Chart.defaults.elements.point.radius = 0;
+  Chart.defaults.elements.point.hoverRadius = 4;
+  Chart.defaults.elements.arc.borderWidth = 0;
+
+  // Scales hairline — sem borda externa, grid sutil, sem tick marks
+  ["linear", "category", "logarithmic", "time"].forEach((scaleType) => {
+    const sc = Chart.defaults.scales[scaleType];
+    if (!sc) return;
+    sc.grid = sc.grid || {};
+    sc.grid.color = grid;
+    sc.grid.lineWidth = 1;
+    sc.grid.tickColor = "transparent";
+    sc.grid.drawBorder = false;
+    sc.border = sc.border || {};
+    sc.border.display = false;
+    sc.ticks = sc.ticks || {};
+    sc.ticks.color = muted;
+    sc.ticks.padding = 6;
+  });
 }
 applyChartTheme();
+
+/* Lê a cor de destaque atual (--accent) */
+function accentColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#7c8c61";
+}
 
 /* ---------- UTILS ---------- */
 
@@ -2024,7 +2063,38 @@ function renderReserva() {
 
 function renderConfig() {
   const el = document.getElementById("config");
+  const currentAccent = accentColor();
+  const presets = [
+    { name: "Sálvia",  hex: "#7c8c61" },
+    { name: "Oliva",   hex: "#5e6a48" },
+    { name: "Tinta",   hex: "#1d1b16" },
+    { name: "Areia",   hex: "#a08868" },
+    { name: "Caramelo",hex: "#b87333" },
+    { name: "Vinho",   hex: "#7d3c4a" },
+    { name: "Marinho", hex: "#3a4f6b" },
+    { name: "Cobre",   hex: "#a05a3a" }
+  ];
   el.innerHTML = `
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Personalização</h2>
+          <p class="panel-sub">Escolha a cor de destaque do painel</p>
+        </div>
+      </div>
+      <div class="accent-row">
+        <input type="color" id="accent-color" value="${currentAccent}" />
+        <div class="accent-presets">
+          ${presets.map((p) => `
+            <button type="button" class="accent-swatch ${p.hex.toLowerCase() === currentAccent.toLowerCase() ? "active" : ""}"
+              data-color="${p.hex}" style="--c:${p.hex}"
+              title="${p.name}" aria-label="${p.name}"></button>
+          `).join("")}
+        </div>
+      </div>
+      <p class="hint">A cor afeta links ativos, foco em formulários, gráficos e a barra das abas. Salva automaticamente.</p>
+    </section>
+
     <section class="panel">
       <div class="panel-head">
         <div>
@@ -2130,6 +2200,27 @@ function renderConfig() {
     state = clone(DEFAULT_STATE);
     saveState(); toast("Dados resetados"); renderAll();
   });
+
+  // Color picker — cor de destaque
+  const accentInput = document.getElementById("accent-color");
+  accentInput?.addEventListener("input", (e) => applyAccent(e.target.value, false));
+  accentInput?.addEventListener("change", (e) => applyAccent(e.target.value, true));
+  document.querySelectorAll("#config .accent-swatch").forEach((sw) => {
+    sw.addEventListener("click", () => {
+      const c = sw.getAttribute("data-color");
+      applyAccent(c, true);
+    });
+  });
+}
+
+function applyAccent(color, persist) {
+  if (!color) return;
+  document.documentElement.style.setProperty("--accent", color);
+  if (persist) {
+    localStorage.setItem("caua_accent", color);
+    applyChartTheme();
+    renderAll();
+  }
 }
 
 /* ---------- HELPERS ---------- */
