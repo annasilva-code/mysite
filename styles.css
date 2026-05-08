@@ -793,6 +793,280 @@ tbody tr:hover:not(.section) {
 }
 
 /* ===========================================
+   BOTTOM NAV (mobile)
+   =========================================== */
+.bottom-nav { display: none; }
+.mobile-more { display: none; }
+.quick-fab { display: none; }
+.quick-sheet { display: none; }
+
+@media (max-width: 720px) {
+  /* Esconde as tabs do topo no mobile */
+  .tabs { display: none; }
+
+  .container {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 90;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.06);
+    padding: 6px calc(6px + env(safe-area-inset-right))
+             env(safe-area-inset-bottom)
+             calc(6px + env(safe-area-inset-left));
+  }
+
+  .bnav-item {
+    flex: 1 1 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px;
+    padding: 6px 4px 8px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.66rem; font-weight: 500;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: color 0.15s ease;
+    min-height: 56px;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+  .bnav-item svg {
+    transition: stroke 0.15s ease;
+  }
+  .bnav-item:hover { color: var(--text); }
+  .bnav-item:active { color: var(--accent); }
+
+  .bnav-item.active {
+    color: var(--accent);
+  }
+  .bnav-item.active svg {
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 4px;
+    box-sizing: content-box;
+    margin-bottom: -4px;
+  }
+
+  /* Drawer "Mais" */
+  .mobile-more,
+  .quick-sheet {
+    display: block;
+  }
+  .mobile-more {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    pointer-events: none;
+  }
+  .mobile-more-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(10, 9, 8, 0.4);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .mobile-more-sheet {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.2);
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(.32, .72, 0, 1);
+    max-height: 80vh; overflow-y: auto;
+  }
+  .mobile-more.open { pointer-events: auto; }
+  .mobile-more.open .mobile-more-backdrop { opacity: 1; }
+  .mobile-more.open .mobile-more-sheet    { transform: translateY(0); }
+
+  .mobile-more-handle {
+    width: 36px; height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+    margin: 4px auto 14px;
+  }
+  .mobile-more-title {
+    margin: 0 0 14px;
+    font-size: 0.78rem; font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .mobile-more-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .mobile-more-item {
+    display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 0.92rem; font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+  .mobile-more-item:hover { border-color: var(--border-strong); }
+  .mobile-more-item:active { background: var(--surface-3); }
+  .mobile-more-item.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-fade);
+  }
+  .mobile-more-item svg { color: var(--muted); }
+  .mobile-more-item.active svg { color: var(--accent); }
+
+  /* ===========================================
+     FAB flutuante "Lançar" (mobile)
+     =========================================== */
+  .quick-fab {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    z-index: 110;
+
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 3px solid var(--bg);
+    background: var(--accent);
+    color: #fff;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+
+    box-shadow:
+      0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent),
+      0 2px 6px rgba(0, 0, 0, 0.15);
+
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+  .quick-fab:hover { transform: translateX(-50%) translateY(-1px); }
+  .quick-fab:active { transform: translateX(-50%) scale(0.94); }
+  .quick-fab svg { transition: transform 0.25s ease; }
+  .quick-sheet.open ~ .quick-fab svg,
+  .quick-fab.open svg { transform: rotate(45deg); }
+
+  /* ===========================================
+     Quick sheet (drawer de lançamento)
+     =========================================== */
+  .quick-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    pointer-events: none;
+  }
+  .quick-sheet-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(10, 9, 8, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .quick-sheet-panel {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.22);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(.32, .72, 0, 1);
+    max-height: 88vh; overflow-y: auto;
+  }
+  .quick-sheet.open                    { pointer-events: auto; }
+  .quick-sheet.open .quick-sheet-backdrop { opacity: 1; }
+  .quick-sheet.open .quick-sheet-panel    { transform: translateY(0); }
+
+  .quick-sheet-handle {
+    width: 36px; height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+    margin: 4px auto 12px;
+  }
+  .quick-sheet-title {
+    margin: 0 0 14px;
+    font-size: 1rem; font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-strong);
+  }
+
+  /* Segmented control Gasto/Entrada */
+  .seg-control {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--surface-2);
+    border-radius: 999px;
+    padding: 4px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+  }
+  .seg-btn {
+    border: none; background: transparent;
+    color: var(--muted);
+    font: inherit; font-weight: 500; font-size: 0.9rem;
+    padding: 8px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color 0.18s ease, background 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+  .seg-btn.active {
+    background: var(--surface);
+    color: var(--text-strong);
+    box-shadow: var(--shadow-sm);
+  }
+  .seg-control[data-tipo="Entrada"] .seg-btn.active { color: var(--success); }
+  .seg-control[data-tipo="Gasto"]   .seg-btn.active { color: var(--text-strong); }
+
+  /* Form do quick-sheet */
+  .quick-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .qf-field { display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1; }
+  .qf-field.qf-half { grid-column: span 1; }
+  .qf-cat { transition: opacity 0.2s ease, max-height 0.25s ease; overflow: hidden; }
+  .qf-cat.is-hidden {
+    opacity: 0; max-height: 0; pointer-events: none;
+    padding: 0; margin: 0; gap: 0;
+  }
+  .qf-actions { display: flex; align-items: flex-end; }
+  .qf-submit { width: 100%; min-height: 44px; }
+  .quick-form input,
+  .quick-form select { width: 100%; }
+}
+
+/* ===========================================
    SIGNATURE
    =========================================== */
 .signature {

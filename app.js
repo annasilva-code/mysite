@@ -1010,7 +1010,7 @@ function renderCaixa(c) {
           <h2 class="panel-title">Fontes de caixa</h2>
           <p class="panel-sub">Saldo atualiza sozinho conforme você lança entradas e gastos</p>
         </div>
-        <button class="btn" id="add-caixa">+ Adicionar local</button>
+        <button class="btn ghost" id="add-caixa" type="button">+ Nova fonte</button>
       </div>
 
       <div class="kpi-grid">
@@ -1094,7 +1094,12 @@ function renderCaixa(c) {
 
   document.getElementById("add-caixa").addEventListener("click", () => {
     const f = document.getElementById("form-caixa");
-    f.style.display = f.style.display === "none" ? "grid" : "none";
+    const showing = f.style.display !== "none";
+    f.style.display = showing ? "none" : "grid";
+    if (!showing) {
+      f.scrollIntoView({ behavior: "smooth", block: "center" });
+      f.querySelector('[name="local"]')?.focus();
+    }
   });
   document.getElementById("form-caixa").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1729,7 +1734,7 @@ function renderMeta(c) {
       <div class="chart-grid" style="margin-top:14px;">
         <article class="panel tight">
           <div class="panel-head"><h2 class="panel-title">Por dia (mês atual)</h2></div>
-          <div class="chart-box tall"><canvas id="chartMeta"></canvas></div>
+          <div class="chart-box" id="chartMetaWrap" style="height:${Math.max(240, diasMes.length * 26 + 60)}px;"><canvas id="chartMeta"></canvas></div>
         </article>
         <article class="panel tight">
           <div class="panel-head"><h2 class="panel-title">Histórico</h2></div>
@@ -1799,20 +1804,30 @@ function renderMeta(c) {
   if (typeof Chart !== "undefined") {
     const labels = diasMes.map((d) => fmtBR(d.data).slice(0, 5));
     if (charts.chartMeta) charts.chartMeta.destroy();
+    const accent = accentColor();
+    const cs = getComputedStyle(document.documentElement);
+    const corUber = cs.getPropertyValue("--text-strong").trim() || "#1d1b16";
     charts.chartMeta = new Chart(document.getElementById("chartMeta"), {
       type: "bar",
       data: {
         labels,
         datasets: [
-          { label: "Uber", data: diasMes.map((d) => d.uber || 0), backgroundColor: "#000", borderRadius: 4, stack: "g" },
-          { label: "99",   data: diasMes.map((d) => d.app99 || 0), backgroundColor: "#ffd400", borderRadius: 4, stack: "g" },
-          { label: "Meta", type: "line", data: diasMes.map(() => meta), borderColor: "#2f7d32", borderDash: [4, 4], pointRadius: 0, fill: false }
+          { label: "Uber", data: diasMes.map((d) => d.uber || 0),  backgroundColor: corUber,  borderRadius: 3, borderSkipped: false, stack: "g", barThickness: 14 },
+          { label: "99",   data: diasMes.map((d) => d.app99 || 0), backgroundColor: "#e6b800", borderRadius: 3, borderSkipped: false, stack: "g", barThickness: 14 },
+          { label: `Meta R$ ${meta}`, type: "line", data: diasMes.map(() => meta), borderColor: accent, borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false }
         ]
       },
       options: {
+        indexAxis: "y",
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom" } },
-        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } }
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, padding: 14 } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${brl(ctx.parsed.x)}` } }
+        },
+        scales: {
+          x: { stacked: true, beginAtZero: true, ticks: { callback: (v) => "R$ " + v } },
+          y: { stacked: true }
+        }
       }
     });
   }
@@ -2234,14 +2249,116 @@ function escapeAttr(s) { return escapeHtml(s); }
 
 /* ---------- TABS ---------- */
 
+const PRIMARY_TABS = ["dashboard", "contas", "gastos", "meta"];
+
+function activateTab(name) {
+  if (!name) return;
+  document.querySelectorAll("[data-tab]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.tab === name);
+  });
+  document.querySelectorAll(".tab-panel").forEach((p) => {
+    p.classList.toggle("active", p.id === name);
+  });
+  // Marca "Mais" como ativo se a aba está dentro do drawer
+  document.getElementById("more-btn")?.classList.toggle("active", !PRIMARY_TABS.includes(name));
+  closeMobileMore();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function openMobileMore()  { document.getElementById("mobile-more")?.classList.add("open"); }
+function closeMobileMore() { document.getElementById("mobile-more")?.classList.remove("open"); }
+
 function setupTabs() {
-  document.querySelectorAll(".tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((x) => x.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById(btn.dataset.tab).classList.add("active");
+  document.querySelectorAll("[data-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+  });
+  document.getElementById("more-btn")?.addEventListener("click", () => {
+    const m = document.getElementById("mobile-more");
+    if (!m) return;
+    m.classList.contains("open") ? closeMobileMore() : openMobileMore();
+  });
+  document.getElementById("mobile-more-backdrop")?.addEventListener("click", closeMobileMore);
+  // Esc fecha drawer e quick sheet
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeMobileMore(); closeQuickSheet(); }
+  });
+}
+
+/* ---------- QUICK FAB (lançar entrada/gasto) ---------- */
+
+function openQuickSheet(tipoInicial) {
+  const sheet = document.getElementById("quick-sheet");
+  const fab = document.getElementById("quick-fab-btn");
+  if (!sheet) return;
+
+  const form = document.getElementById("quick-sheet-form");
+  if (form) {
+    form.fonteId.innerHTML = fonteOptions();
+    form.categoria.innerHTML = categoriaOptions();
+    form.data.value = state.referencia || todayISO();
+    form.descricao.value = "";
+    form.valor.value = "";
+  }
+
+  const seg = sheet.querySelector(".seg-control");
+  const tipo = tipoInicial === "Entrada" ? "Entrada" : "Gasto";
+  setQuickSheetTipo(seg, tipo);
+
+  sheet.classList.add("open");
+  fab?.classList.add("open");
+  setTimeout(() => form?.valor?.focus(), 280);
+}
+
+function closeQuickSheet() {
+  document.getElementById("quick-sheet")?.classList.remove("open");
+  document.getElementById("quick-fab-btn")?.classList.remove("open");
+}
+
+function setQuickSheetTipo(seg, tipo) {
+  if (!seg) return;
+  seg.setAttribute("data-tipo", tipo);
+  seg.querySelectorAll(".seg-btn").forEach((b) => {
+    const isActive = b.dataset.tipo === tipo;
+    b.classList.toggle("active", isActive);
+    b.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  const sheet = document.getElementById("quick-sheet");
+  const catField = sheet?.querySelector(".qf-cat");
+  if (catField) catField.classList.toggle("is-hidden", tipo === "Entrada");
+  const submit = sheet?.querySelector(".qf-submit");
+  if (submit) submit.textContent = tipo === "Entrada" ? "Salvar entrada" : "Salvar gasto";
+}
+
+function setupQuickFab() {
+  const fab = document.getElementById("quick-fab-btn");
+  const sheet = document.getElementById("quick-sheet");
+  if (!fab || !sheet) return;
+
+  fab.addEventListener("click", () => {
+    sheet.classList.contains("open") ? closeQuickSheet() : openQuickSheet("Gasto");
+  });
+
+  document.getElementById("quick-sheet-backdrop")?.addEventListener("click", closeQuickSheet);
+
+  const seg = sheet.querySelector(".seg-control");
+  seg?.querySelectorAll(".seg-btn").forEach((b) => {
+    b.addEventListener("click", () => setQuickSheetTipo(seg, b.dataset.tipo));
+  });
+
+  const form = document.getElementById("quick-sheet-form");
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const tipo = seg?.getAttribute("data-tipo") === "Entrada" ? "Entrada" : "Gasto";
+    const fd = new FormData(form);
+    addMovimentacao({
+      tipo,
+      categoria: tipo === "Gasto" ? String(fd.get("categoria") || "") : "",
+      data: fd.get("data") || todayISO(),
+      descricao: String(fd.get("descricao") || "").trim(),
+      valor: Number(fd.get("valor") || 0),
+      fonteId: fd.get("fonteId") || ""
     });
+    closeQuickSheet();
   });
 }
 
@@ -2307,3 +2424,4 @@ loadState();
 renderAll();
 setupTabs();
 setupThemeToggle();
+setupQuickFab();

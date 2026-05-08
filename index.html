@@ -80,6 +80,127 @@
 
   <div id="theme-ripple" class="theme-ripple" aria-hidden="true"></div>
 
+  <!-- Bottom nav (mobile) — 4 principais + Mais -->
+  <nav class="bottom-nav" aria-label="Navegação inferior">
+    <button class="bnav-item active" data-tab="dashboard" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/>
+        <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/>
+        <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/>
+        <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>
+      </svg>
+      <span>Resumo</span>
+    </button>
+    <button class="bnav-item" data-tab="contas" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 3h14v18l-3.5-2-3.5 2-3.5-2L5 21z"/>
+        <line x1="9" y1="9" x2="15" y2="9"/>
+        <line x1="9" y1="13" x2="15" y2="13"/>
+      </svg>
+      <span>Contas</span>
+    </button>
+    <button class="bnav-item" data-tab="gastos" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 17l6-6 4 4 8-8"/>
+        <polyline points="14 7 21 7 21 14"/>
+        <line x1="3" y1="21" x2="21" y2="21" stroke-width="1.4" opacity="0.5"/>
+      </svg>
+      <span>Gastos</span>
+    </button>
+    <button class="bnav-item" data-tab="meta" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <circle cx="12" cy="12" r="5"/>
+        <circle cx="12" cy="12" r="1.4" fill="currentColor"/>
+      </svg>
+      <span>Meta</span>
+    </button>
+    <button class="bnav-item" id="more-btn" type="button" aria-haspopup="dialog" aria-controls="mobile-more">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="5" cy="12" r="1.5" fill="currentColor"/>
+        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+        <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
+      </svg>
+      <span>Mais</span>
+    </button>
+  </nav>
+
+  <!-- FAB flutuante "Lançar" -->
+  <button class="quick-fab" id="quick-fab-btn" type="button"
+          aria-label="Lançar entrada ou gasto"
+          aria-haspopup="dialog" aria-controls="quick-sheet">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+  </button>
+
+  <!-- Sheet: lançar entrada/gasto rápido -->
+  <div class="quick-sheet" id="quick-sheet" aria-hidden="true" role="dialog" aria-label="Lançar movimentação">
+    <div class="quick-sheet-backdrop" id="quick-sheet-backdrop"></div>
+    <div class="quick-sheet-panel">
+      <div class="quick-sheet-handle" aria-hidden="true"></div>
+      <h3 class="quick-sheet-title">Nova movimentação</h3>
+
+      <div class="seg-control" role="tablist" aria-label="Tipo">
+        <button class="seg-btn active" type="button" data-tipo="Gasto"   role="tab" aria-selected="true">Gasto</button>
+        <button class="seg-btn"        type="button" data-tipo="Entrada" role="tab" aria-selected="false">Entrada</button>
+      </div>
+
+      <form id="quick-sheet-form" class="quick-form">
+        <label class="qf-field">
+          <span class="label">Valor</span>
+          <input name="valor" type="number" min="0.01" step="0.01" inputmode="decimal" required placeholder="R$ 0,00" />
+        </label>
+        <label class="qf-field">
+          <span class="label">Descrição</span>
+          <input name="descricao" required maxlength="60" placeholder="Ex: almoço, gasolina" />
+        </label>
+        <label class="qf-field qf-cat">
+          <span class="label">Categoria</span>
+          <select name="categoria" required></select>
+        </label>
+        <label class="qf-field">
+          <span class="label">Fonte (de onde sai/entra)</span>
+          <select name="fonteId" required></select>
+        </label>
+        <label class="qf-field qf-half">
+          <span class="label">Data</span>
+          <input name="data" type="date" required />
+        </label>
+        <div class="qf-field qf-half qf-actions">
+          <button class="btn primary qf-submit" type="submit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Drawer de "Mais" -->
+  <div class="mobile-more" id="mobile-more" aria-hidden="true" role="dialog" aria-label="Mais opções">
+    <div class="mobile-more-backdrop" id="mobile-more-backdrop"></div>
+    <div class="mobile-more-sheet">
+      <div class="mobile-more-handle" aria-hidden="true"></div>
+      <h3 class="mobile-more-title">Mais opções</h3>
+      <div class="mobile-more-grid">
+        <button class="mobile-more-item" data-tab="caixa" type="button">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M16 12.5h2"/><path d="M2.5 9.5h19"/></svg>
+          <span>Caixa</span>
+        </button>
+        <button class="mobile-more-item" data-tab="combustivel" type="button">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="10" height="18" rx="1.5"/><path d="M14 9h2.5a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-2.5-2.5"/></svg>
+          <span>Combustível</span>
+        </button>
+        <button class="mobile-more-item" data-tab="reserva" type="button">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12.5c0-3.5 3-6 7-6 1.6 0 2.8.4 3.8 1l3-1.5-1 4c.7.9 1.2 1.9 1.2 3 0 1-.4 1.9-1 2.7v2.3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-.5H8.5V18a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2.5c-1.2-.9-2-2.1-2-3.5z"/><circle cx="9" cy="11.5" r="0.7" fill="currentColor"/></svg>
+          <span>Reserva</span>
+        </button>
+        <button class="mobile-more-item" data-tab="config" type="button">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          <span>Categorias</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Aplica tema + cor de destaque o quanto antes pra evitar flash
     (function () {
