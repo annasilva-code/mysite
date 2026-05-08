@@ -2416,35 +2416,33 @@ function prepareMoneyInput(inp) {
   }
 }
 
+// Decimal implícito: usuário digita só dígitos, vírgula desliza no fim
+// Ex: "5" → "0,05" · "50" → "0,50" · "5000" → "50,00" · "7653849" → "76.538,49"
+function formatLiveCurrency(rawDigits) {
+  if (!rawDigits) return "";
+  const cleaned = rawDigits.replace(/^0+(?=\d)/, ""); // remove zeros à esquerda
+  const value = Number(cleaned || "0") / 100;
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function setupCurrencyInputs() {
-  // Filtra digitação: só permite dígitos, vírgula e ponto
+  // Formata ao vivo conforme digita
   document.body.addEventListener("input", (e) => {
     const inp = e.target;
     if (!isMoneyInput(inp)) return;
-    const before = inp.value;
-    const sanitized = before.replace(/[^\d,.]/g, "");
-    if (sanitized !== before) inp.value = sanitized;
+    const digits = (inp.value || "").replace(/\D/g, "");
+    const formatted = digits ? formatLiveCurrency(digits) : "";
+    if (inp.value !== formatted) {
+      inp.value = formatted;
+      // Cursor sempre no fim (padrão decimal implícito)
+      requestAnimationFrame(() => {
+        const len = inp.value.length;
+        try { inp.setSelectionRange(len, len); } catch (_) {}
+      });
+    }
   });
 
-  // Ao sair do campo, formata pra "X.XXX,XX"
-  document.body.addEventListener("focusout", (e) => {
-    const inp = e.target;
-    if (!isMoneyInput(inp)) return;
-    if (inp.value.trim() === "") return;
-    inp.value = fmtMoneyBR(parseMoney(inp.value));
-  });
-
-  // Ao entrar, mostra valor "limpo" (sem milhar) pra digitação fácil
-  document.body.addEventListener("focusin", (e) => {
-    const inp = e.target;
-    if (!isMoneyInput(inp)) return;
-    if (inp.value.trim() === "") return;
-    const n = parseMoney(inp.value);
-    inp.value = n === 0 ? "" : String(n).replace(".", ",");
-    requestAnimationFrame(() => inp.select?.());
-  });
-
-  // Antes de submit, normaliza pra string numérica que o handler já espera
+  // Antes de submit, normaliza pra string numérica que os handlers já leem
   document.body.addEventListener("submit", (e) => {
     const form = e.target;
     if (!form || !form.querySelectorAll) return;
@@ -2453,7 +2451,6 @@ function setupCurrencyInputs() {
     });
   }, true);
 
-  // Aplica em inputs já presentes
   refreshMoneyInputs();
 }
 
