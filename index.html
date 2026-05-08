@@ -1,28 +1,49 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Painel Financeiro - Caua Ramos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="container">
     <header class="header">
-      <h1>Painel Financeiro - Caua Ramos</h1>
-      <p>Atualizado em <strong>08/05/2026 09:25</strong></p>
+      <div class="header-row">
+        <div>
+          <span class="header-eyebrow">Painel Financeiro</span>
+          <h1>Cauã Ramos</h1>
+        </div>
+        <div class="header-meta">
+          <span class="dot"></span>
+          <span>Atualizado em <strong id="header-date">--</strong></span>
+        </div>
+      </div>
     </header>
 
-    <nav class="tabs" aria-label="Navegacao de secoes">
-      <button class="tab active" data-tab="dashboard">Dashboard</button>
-      <button class="tab" data-tab="planilha">Planilha</button>
-      <button class="tab" data-tab="regras">Regras</button>
+    <nav class="tabs" aria-label="Navegação de seções">
+      <button class="tab active" data-tab="dashboard">Resumo</button>
+      <button class="tab" data-tab="contas">Contas</button>
+      <button class="tab" data-tab="caixa">Caixa &amp; Entradas</button>
+      <button class="tab" data-tab="gastos">Gastos</button>
+      <button class="tab" data-tab="meta">Meta Uber/99</button>
+      <button class="tab" data-tab="reserva">Reserva</button>
+      <button class="tab" data-tab="config">Categorias</button>
     </nav>
 
     <section id="dashboard" class="tab-panel active"></section>
-    <section id="planilha" class="tab-panel"></section>
-    <section id="regras" class="tab-panel"></section>
+    <section id="contas" class="tab-panel"></section>
+    <section id="caixa" class="tab-panel"></section>
+    <section id="gastos" class="tab-panel"></section>
+    <section id="meta" class="tab-panel"></section>
+    <section id="reserva" class="tab-panel"></section>
+    <section id="config" class="tab-panel"></section>
   </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="app.js"></script>
