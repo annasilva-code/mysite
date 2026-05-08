@@ -15,3 +15,7 @@
 ## Atualizar dados
 - Edite o objeto `state` em `app.js` para atualizar valores do painel.
 - Se quiser manter sincronizado com Excel, atualize tambem os CSVs em `dados/`.
+
+## Nota Mensal
+- Use o dashboard para acompanhar entradas, gastos e metas por categoria ao longo do mes.
+- No fechamento mensal, revise categorias com maior estouro para ajustar as metas do proximo mes.
