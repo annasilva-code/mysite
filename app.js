@@ -1,7 +1,9 @@
-﻿const STORAGE_KEY = "caua_financas_v2";
+﻿const STORAGE_KEY = "caua_financas_v3";
 
 const state = {
   atualizadoEm: "08/05/2026 09:25",
+  periodo: "mes",
+  referencia: todayISO(),
   caixa: [
     { local: "Banco Santander", valor: 419.22 },
     { local: "Especie", valor: 25.0 },
@@ -22,7 +24,6 @@ const state = {
     { nome: "Casa", meta: 100 }
   ],
   movimentacoes: [],
-  metaDia: 120,
   regras: [
     "Registrar entradas e gastos diariamente.",
     "Combustivel e gastos pessoais por categoria com meta propria.",
@@ -37,6 +38,45 @@ let barChart;
 const brl = (v) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const sum = (arr) => arr.reduce((acc, x) => acc + x, 0);
 
+function todayISO() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+}
+
+function parseISO(value) {
+  const [y, m, d] = String(value).split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+function isoWeekKey(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function periodLabel() {
+  const ref = parseISO(state.referencia);
+  if (state.periodo === "dia") return `Dia ${state.referencia}`;
+  if (state.periodo === "semana") return `Semana ${isoWeekKey(ref)}`;
+  return `Mes ${String(ref.getMonth() + 1).padStart(2, "0")}/${ref.getFullYear()}`;
+}
+
+function inSelectedPeriod(isoDate) {
+  const ref = parseISO(state.referencia);
+  const dt = parseISO(isoDate || state.referencia);
+  if (state.periodo === "dia") {
+    return dt.toDateString() === ref.toDateString();
+  }
+  if (state.periodo === "semana") {
+    return isoWeekKey(dt) === isoWeekKey(ref);
+  }
+  return dt.getMonth() === ref.getMonth() && dt.getFullYear() === ref.getFullYear();
+}
+
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return;
@@ -44,6 +84,8 @@ function loadState() {
     const saved = JSON.parse(raw);
     if (Array.isArray(saved.movimentacoes)) state.movimentacoes = saved.movimentacoes;
     if (Array.isArray(saved.categorias)) state.categorias = saved.categorias;
+    if (saved.periodo) state.periodo = saved.periodo;
+    if (saved.referencia) state.referencia = saved.referencia;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -52,14 +94,18 @@ function loadState() {
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     movimentacoes: state.movimentacoes,
-    categorias: state.categorias
+    categorias: state.categorias,
+    periodo: state.periodo,
+    referencia: state.referencia
   }));
 }
 
 function compute() {
   const caixaBase = sum(state.caixa.map((x) => x.valor));
-  const entradas = sum(state.movimentacoes.filter((m) => m.tipo === "Entrada").map((m) => m.valor));
-  const gastos = sum(state.movimentacoes.filter((m) => m.tipo === "Gasto").map((m) => m.valor));
+  const movPeriodo = state.movimentacoes.filter((m) => inSelectedPeriod(m.data));
+
+  const entradas = sum(movPeriodo.filter((m) => m.tipo === "Entrada").map((m) => m.valor));
+  const gastos = sum(movPeriodo.filter((m) => m.tipo === "Gasto").map((m) => m.valor));
   const caixaAtual = caixaBase + entradas - gastos;
 
   const contasTotal = sum(state.contas.map((x) => x.valor));
@@ -67,7 +113,7 @@ function compute() {
 
   const gastoPorCategoria = {};
   state.categorias.forEach((c) => { gastoPorCategoria[c.nome] = 0; });
-  state.movimentacoes
+  movPeriodo
     .filter((m) => m.tipo === "Gasto")
     .forEach((m) => {
       if (!gastoPorCategoria[m.categoria]) gastoPorCategoria[m.categoria] = 0;
@@ -81,10 +127,8 @@ function compute() {
     return { ...c, gasto, restante, percentual };
   });
 
-  const totalMetaCategorias = sum(state.categorias.map((c) => c.meta));
-  const totalGastoCategorias = sum(categoriasResumo.map((c) => c.gasto));
-
   return {
+    movPeriodo,
     caixaBase,
     entradas,
     gastos,
@@ -92,8 +136,8 @@ function compute() {
     contasTotal,
     deficit,
     categoriasResumo,
-    totalMetaCategorias,
-    totalGastoCategorias
+    totalMetaCategorias: sum(state.categorias.map((c) => c.meta)),
+    totalGastoCategorias: sum(categoriasResumo.map((c) => c.gasto))
   };
 }
 
@@ -103,20 +147,29 @@ function renderDashboard(c) {
   const el = document.getElementById("dashboard");
   el.innerHTML = `
     <section class="table-wrap">
+      <h2>Visao de Periodo</h2>
+      <div class="period-row">
+        <button class="period-btn ${state.periodo === "dia" ? "active" : ""}" data-periodo="dia">Dia</button>
+        <button class="period-btn ${state.periodo === "semana" ? "active" : ""}" data-periodo="semana">Semana</button>
+        <button class="period-btn ${state.periodo === "mes" ? "active" : ""}" data-periodo="mes">Mes</button>
+        <input type="date" id="ref-date" value="${state.referencia}" />
+      </div>
+      <p class="hint">Filtro atual: <strong>${periodLabel()}</strong></p>
+    </section>
+
+    <section class="table-wrap">
       <h2>Lancar Movimentacao</h2>
       <form id="mov-form" class="form-grid">
         <select name="tipo" id="tipo-select" required>
           <option value="Entrada">Entrada</option>
           <option value="Gasto">Gasto</option>
         </select>
-        <select name="categoria" id="categoria-select" required>
-          ${categoryOptions}
-        </select>
+        <select name="categoria" id="categoria-select" required>${categoryOptions}</select>
+        <input name="data" type="date" required value="${state.referencia}" />
         <input name="descricao" required placeholder="Descricao" maxlength="60" />
         <input name="valor" type="number" min="0.01" step="0.01" required placeholder="Valor" />
         <button type="submit">Adicionar</button>
       </form>
-      <p class="hint">Categoria so conta para Gasto. Entrada soma direto no caixa.</p>
     </section>
 
     <section class="table-wrap">
@@ -130,8 +183,8 @@ function renderDashboard(c) {
 
     <div class="grid">
       <article class="card"><h3>Caixa Atual</h3><div class="value">${brl(c.caixaAtual)}</div></article>
-      <article class="card"><h3>Entradas</h3><div class="value">+${brl(c.entradas)}</div></article>
-      <article class="card"><h3>Gastos</h3><div class="value">-${brl(c.gastos)}</div></article>
+      <article class="card"><h3>Entradas (${periodLabel()})</h3><div class="value">+${brl(c.entradas)}</div></article>
+      <article class="card"><h3>Gastos (${periodLabel()})</h3><div class="value">-${brl(c.gastos)}</div></article>
       <article class="card"><h3>Falta p/ contas</h3><div class="value">${brl(c.deficit)}</div></article>
     </div>
 
@@ -140,18 +193,9 @@ function renderDashboard(c) {
       <table>
         <thead><tr><th>Categoria</th><th>Meta</th><th>Gasto</th><th>Pode gastar</th><th>% usado</th></tr></thead>
         <tbody>
-          ${c.categoriasResumo.map((x) => `
-            <tr>
-              <td>${x.nome}</td>
-              <td>${brl(x.meta)}</td>
-              <td>${brl(x.gasto)}</td>
-              <td class="${x.restante < 0 ? "neg" : "ok"}">${brl(x.restante)}</td>
-              <td>${x.percentual.toFixed(1)}%</td>
-            </tr>
-          `).join("")}
+          ${c.categoriasResumo.map((x) => `<tr><td>${x.nome}</td><td>${brl(x.meta)}</td><td>${brl(x.gasto)}</td><td class="${x.restante < 0 ? "neg" : "ok"}">${brl(x.restante)}</td><td>${x.percentual.toFixed(1)}%</td></tr>`).join("")}
         </tbody>
       </table>
-      <p><strong>Total metas:</strong> ${brl(c.totalMetaCategorias)} | <strong>Total gasto em categorias:</strong> ${brl(c.totalGastoCategorias)}</p>
     </section>
 
     <section class="chart-grid">
@@ -160,30 +204,34 @@ function renderDashboard(c) {
     </section>
 
     <section class="table-wrap">
-      <h2>Movimentacoes</h2>
+      <h2>Movimentacoes (${periodLabel()})</h2>
       <table>
-        <thead><tr><th>Tipo</th><th>Categoria</th><th>Descricao</th><th>Valor</th><th>Acao</th></tr></thead>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descricao</th><th>Valor</th><th>Acao</th></tr></thead>
         <tbody>
-          ${state.movimentacoes.length ? state.movimentacoes.map((m) => `
-            <tr>
-              <td>${m.tipo}</td>
-              <td>${m.tipo === "Entrada" ? "-" : m.categoria}</td>
-              <td>${m.descricao}</td>
-              <td>${m.tipo === "Entrada" ? "+" : "-"}${brl(m.valor)}</td>
-              <td><button class="btn-danger" data-remove-id="${m.id}">Remover</button></td>
-            </tr>
-          `).join("") : `<tr><td colspan="5">Sem lancamentos ainda.</td></tr>`}
+          ${c.movPeriodo.length ? c.movPeriodo.map((m) => `<tr><td>${m.data}</td><td>${m.tipo}</td><td>${m.tipo === "Entrada" ? "-" : m.categoria}</td><td>${m.descricao}</td><td>${m.tipo === "Entrada" ? "+" : "-"}${brl(m.valor)}</td><td><button class="btn-danger" data-remove-id="${m.id}">Remover</button></td></tr>`).join("") : `<tr><td colspan="6">Sem lancamentos no periodo.</td></tr>`}
         </tbody>
       </table>
     </section>
   `;
 
+  el.querySelectorAll(".period-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.periodo = btn.getAttribute("data-periodo");
+      saveState();
+      renderAll();
+    });
+  });
+
+  document.getElementById("ref-date").addEventListener("change", (e) => {
+    state.referencia = e.target.value || todayISO();
+    saveState();
+    renderAll();
+  });
+
   const form = document.getElementById("mov-form");
   const tipoSelect = document.getElementById("tipo-select");
   const categoriaSelect = document.getElementById("categoria-select");
-  const syncCategoria = () => {
-    categoriaSelect.disabled = tipoSelect.value === "Entrada";
-  };
+  const syncCategoria = () => { categoriaSelect.disabled = tipoSelect.value === "Entrada"; };
   syncCategoria();
   tipoSelect.addEventListener("change", syncCategoria);
 
@@ -191,30 +239,24 @@ function renderDashboard(c) {
     e.preventDefault();
     const fd = new FormData(form);
     const tipo = String(fd.get("tipo"));
+    const data = String(fd.get("data") || todayISO());
     const descricao = String(fd.get("descricao") || "").trim();
     const valor = Number(fd.get("valor") || 0);
     const categoria = String(fd.get("categoria") || "");
     if (!descricao || !Number.isFinite(valor) || valor <= 0) return;
 
-    state.movimentacoes.unshift({
-      id: crypto.randomUUID(),
-      tipo,
-      categoria: tipo === "Gasto" ? categoria : "",
-      descricao,
-      valor
-    });
+    state.movimentacoes.unshift({ id: crypto.randomUUID(), tipo, data, categoria: tipo === "Gasto" ? categoria : "", descricao, valor });
     saveState();
     renderAll();
   });
 
-  const metaForm = document.getElementById("meta-form");
-  metaForm.addEventListener("submit", (e) => {
+  document.getElementById("meta-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const fd = new FormData(metaForm);
+    const fd = new FormData(e.currentTarget);
     const categoriaMeta = String(fd.get("categoriaMeta") || "");
     const novoLimite = Number(fd.get("novoLimite") || 0);
     if (!categoriaMeta || !Number.isFinite(novoLimite) || novoLimite <= 0) return;
-    state.categorias = state.categorias.map((c) => c.nome === categoriaMeta ? { ...c, meta: novoLimite } : c);
+    state.categorias = state.categorias.map((cat) => cat.nome === categoriaMeta ? { ...cat, meta: novoLimite } : cat);
     saveState();
     renderAll();
   });
@@ -235,58 +277,34 @@ function renderCharts(c) {
   const labels = c.categoriasResumo.map((x) => x.nome);
   const gastos = c.categoriasResumo.map((x) => Number(x.gasto.toFixed(2)));
   const metas = c.categoriasResumo.map((x) => Number(x.meta.toFixed(2)));
-
   if (pieChart) pieChart.destroy();
   if (barChart) barChart.destroy();
 
-  const pieCtx = document.getElementById("pieChart");
-  const barCtx = document.getElementById("barChart");
-
-  pieChart = new Chart(pieCtx, {
+  pieChart = new Chart(document.getElementById("pieChart"), {
     type: "pie",
-    data: {
-      labels,
-      datasets: [{ data: gastos, backgroundColor: ["#4caf50", "#ff9800", "#03a9f4", "#e91e63", "#9c27b0"] }]
-    },
+    data: { labels, datasets: [{ data: gastos, backgroundColor: ["#4caf50", "#ff9800", "#03a9f4", "#e91e63", "#9c27b0"] }] },
     options: { plugins: { legend: { position: "bottom" } } }
   });
 
-  barChart = new Chart(barCtx, {
+  barChart = new Chart(document.getElementById("barChart"), {
     type: "bar",
-    data: {
-      labels,
-      datasets: [
-        { label: "Meta", data: metas, backgroundColor: "#81c784" },
-        { label: "Gasto", data: gastos, backgroundColor: "#ef5350" }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: "bottom" } },
-      scales: { y: { beginAtZero: true } }
-    }
+    data: { labels, datasets: [{ label: "Meta", data: metas, backgroundColor: "#81c784" }, { label: "Gasto", data: gastos, backgroundColor: "#ef5350" }] },
+    options: { responsive: true, plugins: { legend: { position: "bottom" } }, scales: { y: { beginAtZero: true } } }
   });
 }
 
 function renderPlanilha(c) {
   const el = document.getElementById("planilha");
   el.innerHTML = `
-    ${table("Caixa Base", ["Local", "Valor"], state.caixa.map((i) => [i.local, brl(i.valor)]), ["Total base", brl(c.caixaBase)])}
-    ${table("Entradas e Gastos", ["Item", "Valor"], [["Entradas", `+${brl(c.entradas)}`], ["Gastos", `-${brl(c.gastos)}`], ["Caixa atual", brl(c.caixaAtual)]], null)}
-    ${table("Contas a Pagar", ["Despesa", "Vencimento", "Valor", "Prioridade", "Status"], state.contas.map((i) => [i.despesa, i.vencimento, brl(i.valor), i.prioridade, i.status]), ["Total", "", brl(c.contasTotal), "", ""]) }
+    ${table("Resumo do Periodo", ["Periodo", "Valor"], [["Filtro", periodLabel()], ["Entradas", `+${brl(c.entradas)}`], ["Gastos", `-${brl(c.gastos)}`], ["Caixa atual", brl(c.caixaAtual)]], null)}
+    ${table("Contas a Pagar", ["Despesa", "Vencimento", "Valor", "Prioridade", "Status"], state.contas.map((i) => [i.despesa, i.vencimento, brl(i.valor), i.prioridade, i.status]), ["Total", "", brl(c.contasTotal), "", ""])}
     ${table("Resumo Categorias", ["Categoria", "Meta", "Gasto", "Pode gastar", "% usado"], c.categoriasResumo.map((x) => [x.nome, brl(x.meta), brl(x.gasto), brl(x.restante), `${x.percentual.toFixed(1)}%`]), null)}
   `;
 }
 
 function renderRegras() {
   const el = document.getElementById("regras");
-  el.innerHTML = `
-    <section class="table-wrap">
-      <h2>Regras Ativas</h2>
-      <ul>${state.regras.map((r) => `<li>${r}</li>`).join("")}</ul>
-      <p><strong>Atualizacao:</strong> ${state.atualizadoEm}</p>
-    </section>
-  `;
+  el.innerHTML = `<section class="table-wrap"><h2>Regras Ativas</h2><ul>${state.regras.map((r) => `<li>${r}</li>`).join("")}</ul><p><strong>Atualizacao:</strong> ${state.atualizadoEm}</p></section>`;
 }
 
 function table(title, headers, rows, totalRow) {

@@ -23,7 +23,10 @@ body { margin: 0; font-family: "Segoe UI", Tahoma, sans-serif; background: radia
 .card .value { font-size: 1.3rem; font-weight: 700; }
 .progress, .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
 .table-wrap { overflow-x: auto; }
-.form-grid { display: grid; grid-template-columns: 140px 170px 1fr 140px 130px; gap: 8px; }
+.period-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.period-btn { border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.period-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.form-grid { display: grid; grid-template-columns: 130px 160px 150px 1fr 130px 130px; gap: 8px; }
 .form-grid-meta { grid-template-columns: 220px 160px 180px; }
 .form-grid input, .form-grid select, .form-grid button { border: 1px solid var(--border); border-radius: 8px; padding: 10px; font: inherit; }
 .form-grid button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
