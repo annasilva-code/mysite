@@ -3,7 +3,7 @@
    Estado persistido em localStorage. Tudo editavel.
 ========================================================= */
 
-const STORAGE_KEY = "caua_financas_v6";
+const STORAGE_KEY = "caua_financas_v7";
 
 const SANT_ID = "santander_default";
 
@@ -11,16 +11,16 @@ const DEFAULT_STATE = {
   periodo: "mes",
   referencia: todayISO(),
   caixa: [
-    { id: SANT_ID,  local: "Banco Santander", valor: 419.22, cor: "#e60000" },
-    { id: uid(),    local: "Espécie",         valor: 25.0,   cor: "#43a047" },
-    { id: uid(),    local: "Saldo Uber",      valor: 23.42,  cor: "#000000" },
-    { id: uid(),    local: "Saldo 99",        valor: 72.65,  cor: "#ffd400" }
+    { id: SANT_ID,  local: "Banco Santander", valor: 419.22, cor: "#ff5564" },
+    { id: uid(),    local: "Espécie",         valor: 25.0,   cor: "#4ade80" },
+    { id: uid(),    local: "Saldo Uber",      valor: 23.42,  cor: "#ffffff" },
+    { id: uid(),    local: "Saldo 99",        valor: 72.65,  cor: "#ff9a3c" }
   ],
   contas: [
     {
       id: uid(), descricao: "Cartão tia", grupo: "tia",
       vencimento: "2026-05-10", prioridade: 1, status: "pendente",
-      cor: "#c2185b",
+      cor: "#a06a48",
       itens: [
         { id: uid(), descricao: "Compra exemplo", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 331.24, valorPago: 0 }
       ]
@@ -28,34 +28,34 @@ const DEFAULT_STATE = {
     {
       id: uid(), descricao: "Aluguel", grupo: "outras",
       vencimento: "2026-05-10", prioridade: 2, status: "pendente",
-      cor: "#5d4037",
+      cor: "#ff5564",
       itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 500.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Energia", grupo: "outras",
       vencimento: "2026-05-10", prioridade: 3, status: "pendente",
-      cor: "#fbc02d",
+      cor: "#ff9a3c",
       itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 125.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Internet", grupo: "outras",
       vencimento: "2026-05-10", prioridade: 4, status: "pendente",
-      cor: "#0288d1",
+      cor: "#5ee2ff",
       itens: [{ id: uid(), descricao: "Mensal", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 31.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Dentista", grupo: "outras",
       vencimento: "2026-05-15", prioridade: 5, status: "pendente",
-      cor: "#7b1fa2",
+      cor: "#4ade80",
       itens: [{ id: uid(), descricao: "Sessão", parcelaAtual: 1, parcelasTotal: 1, valorParcela: 75.0, valorPago: 0 }]
     }
   ],
   categorias: [
-    { id: uid(), nome: "Alimentação", cor: "#4caf50", excluirDoLimite: false },
-    { id: uid(), nome: "Combustível", cor: "#ff9800", excluirDoLimite: true  },
-    { id: uid(), nome: "Lanche",      cor: "#03a9f4", excluirDoLimite: false },
-    { id: uid(), nome: "Casa",        cor: "#9c27b0", excluirDoLimite: false },
-    { id: uid(), nome: "Reserva",     cor: "#3f51b5", excluirDoLimite: false }
+    { id: uid(), nome: "Alimentação", cor: "#4ade80", excluirDoLimite: false },
+    { id: uid(), nome: "Combustível", cor: "#ff9a3c", excluirDoLimite: true  },
+    { id: uid(), nome: "Lanche",      cor: "#5ee2ff", excluirDoLimite: false },
+    { id: uid(), nome: "Casa",        cor: "#a06a48", excluirDoLimite: false },
+    { id: uid(), nome: "Reserva",     cor: "#ff5564", excluirDoLimite: false }
   ],
   movimentacoes: [
     /* { id, tipo: "Entrada"|"Gasto", data, categoria, descricao, valor, fonteId } */
@@ -88,6 +88,30 @@ const DEFAULT_STATE = {
 
 let state = clone(DEFAULT_STATE);
 let charts = {};
+
+/* Defaults globais Chart.js — sincronizados com o tema */
+function applyChartTheme() {
+  if (typeof Chart === "undefined") return;
+  const cs = getComputedStyle(document.documentElement);
+  const muted = cs.getPropertyValue("--muted").trim() || "#8aa0c0";
+  const text = cs.getPropertyValue("--text-strong").trim() || "#ffffff";
+  const grid = cs.getPropertyValue("--chart-grid").trim() || "rgba(255,255,255,0.06)";
+  const tipBg = cs.getPropertyValue("--tooltip-bg").trim() || "rgba(20, 39, 71, 0.95)";
+  const tipTitle = cs.getPropertyValue("--tooltip-title").trim() || "#ffffff";
+  const tipBody = cs.getPropertyValue("--tooltip-text").trim() || "#f4f7fb";
+
+  Chart.defaults.color = muted;
+  Chart.defaults.borderColor = grid;
+  Chart.defaults.font.family = '"Inter", "Segoe UI", sans-serif';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.plugins.legend.labels.color = text;
+  Chart.defaults.plugins.tooltip.backgroundColor = tipBg;
+  Chart.defaults.plugins.tooltip.titleColor = tipTitle;
+  Chart.defaults.plugins.tooltip.bodyColor = tipBody;
+  Chart.defaults.plugins.tooltip.borderColor = "rgba(74, 222, 128, 0.3)";
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+}
+applyChartTheme();
 
 /* ---------- UTILS ---------- */
 
@@ -2125,6 +2149,50 @@ function renderAll() {
   renderConfig();
 }
 
+/* ---------- THEME TOGGLE ---------- */
+
+function setupThemeToggle() {
+  const btn = document.getElementById("theme-toggle");
+  const ripple = document.getElementById("theme-ripple");
+  if (!btn || !ripple) return;
+
+  btn.addEventListener("click", (e) => {
+    const current = document.documentElement.getAttribute("data-theme") || "dark";
+    const next = current === "dark" ? "light" : "dark";
+
+    // Posição do clique para o ripple começar dali
+    const rect = btn.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    ripple.style.setProperty("--rx", `${cx}px`);
+    ripple.style.setProperty("--ry", `${cy}px`);
+
+    // Cor do "véu" = cor de fundo do tema DESTINO
+    // Lê uma var temporariamente aplicada ao documento
+    document.documentElement.setAttribute("data-theme", next);
+    const destBg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#0a1628";
+    document.documentElement.setAttribute("data-theme", current);
+    ripple.style.background = destBg;
+
+    // Dispara o ripple
+    ripple.classList.remove("go");
+    void ripple.offsetWidth; // reflow para reiniciar animação
+    ripple.classList.add("go");
+
+    // Troca o tema no meio da animação (quando o ripple cobriu o suficiente)
+    setTimeout(() => {
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("caua_tema", next);
+      applyChartTheme();
+      renderAll();
+    }, 320);
+
+    // Tira o ripple ao final
+    setTimeout(() => { ripple.classList.remove("go"); ripple.style.opacity = 0; }, 720);
+  });
+}
+
 loadState();
 renderAll();
 setupTabs();
+setupThemeToggle();

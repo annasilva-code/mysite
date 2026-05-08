@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Financeiro - Caua Ramos</title>
+  <title>Lord Cauã - Painel Financeiro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -15,11 +15,33 @@
       <div class="header-row">
         <div>
           <span class="header-eyebrow">Painel Financeiro</span>
-          <h1>Cauã Ramos</h1>
+          <h1>Lord Cauã</h1>
         </div>
-        <div class="header-meta">
-          <span class="dot"></span>
-          <span>Atualizado em <strong id="header-date">--</strong></span>
+        <div class="header-controls">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema claro/escuro">
+            <span class="theme-icon sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4.2"/>
+                <line x1="12" y1="2.5" x2="12" y2="5"/>
+                <line x1="12" y1="19" x2="12" y2="21.5"/>
+                <line x1="2.5" y1="12" x2="5" y2="12"/>
+                <line x1="19" y1="12" x2="21.5" y2="12"/>
+                <line x1="4.9" y1="4.9" x2="6.7" y2="6.7"/>
+                <line x1="17.3" y1="17.3" x2="19.1" y2="19.1"/>
+                <line x1="4.9" y1="19.1" x2="6.7" y2="17.3"/>
+                <line x1="17.3" y1="6.7" x2="19.1" y2="4.9"/>
+              </svg>
+            </span>
+            <span class="theme-icon moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+              </svg>
+            </span>
+          </button>
+          <div class="header-meta">
+            <span class="dot"></span>
+            <span>Atualizado em <strong id="header-date">--</strong></span>
+          </div>
         </div>
       </div>
     </header>
@@ -46,6 +68,20 @@
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div class="signature" title="feito com amor">
+    site criado por bibia <span class="heart">♥</span> para ajudar lord cauã a ser mais responsável
+  </div>
+
+  <div id="theme-ripple" class="theme-ripple" aria-hidden="true"></div>
+
+  <script>
+    // Aplica o tema o quanto antes pra evitar flash
+    (function () {
+      var saved = localStorage.getItem("caua_tema") || "dark";
+      document.documentElement.setAttribute("data-theme", saved);
+    })();
+  </script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="app.js"></script>
