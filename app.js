@@ -1674,25 +1674,33 @@ function renderMeta(c) {
   const el = document.getElementById("meta");
   const meta = state.config.metaUberDiaria;
 
-  // Filtra apenas dias úteis do mês de referência
+  // Lançamentos individuais do mês de referência (apenas dias úteis)
   const ref = parseISO(state.referencia);
-  const diasMes = state.uberDias
-    .filter((d) => {
-      const dt = parseISO(d.data);
-      return dt.getMonth() === ref.getMonth() && dt.getFullYear() === ref.getFullYear() && isWeekday(dt);
-    })
-    .sort((a, b) => a.data.localeCompare(b.data));
+  const lancamentosMes = state.uberDias.filter((d) => {
+    const dt = parseISO(d.data);
+    return dt.getMonth() === ref.getMonth() && dt.getFullYear() === ref.getFullYear() && isWeekday(dt);
+  });
 
-  const totalMes = sum(diasMes.map((d) => (d.uber || 0) + (d.app99 || 0)));
-  const totalUber = sum(diasMes.map((d) => d.uber || 0));
-  const total99 = sum(diasMes.map((d) => d.app99 || 0));
+  // Agrupa por dia: cada item vira { data, uber (soma), app99 (soma), lancamentos: [...] }
+  const porDia = {};
+  lancamentosMes.forEach((l) => {
+    if (!porDia[l.data]) porDia[l.data] = { data: l.data, uber: 0, app99: 0, lancamentos: [] };
+    porDia[l.data].uber  += Number(l.uber  || 0);
+    porDia[l.data].app99 += Number(l.app99 || 0);
+    porDia[l.data].lancamentos.push(l);
+  });
+  const diasMes = Object.values(porDia).sort((a, b) => a.data.localeCompare(b.data));
+
+  const totalMes  = sum(diasMes.map((d) => d.uber + d.app99));
+  const totalUber = sum(diasMes.map((d) => d.uber));
+  const total99   = sum(diasMes.map((d) => d.app99));
   const diasBatidos = diasMes.filter((d) => (d.uber + d.app99) >= meta).length;
   const lucroAcumulado = sum(diasMes.map((d) => Math.max(0, (d.uber + d.app99) - meta)));
   const deficitAcumulado = sum(diasMes.map((d) => Math.max(0, meta - (d.uber + d.app99))));
 
-  // saldo do dia hoje
-  const hoje = state.uberDias.find((d) => d.data === state.referencia);
-  const totalHoje = hoje ? (hoje.uber || 0) + (hoje.app99 || 0) : 0;
+  // saldo do dia hoje (soma dos lançamentos de hoje)
+  const lancamentosHoje = state.uberDias.filter((d) => d.data === state.referencia);
+  const totalHoje = sum(lancamentosHoje.map((l) => (l.uber || 0) + (l.app99 || 0)));
   const dif = totalHoje - meta;
 
   el.innerHTML = `
@@ -1738,26 +1746,34 @@ function renderMeta(c) {
         </article>
         <article class="panel tight">
           <div class="panel-head"><h2 class="panel-title">Histórico</h2></div>
-          ${diasMes.length === 0 ? `<p class="muted">Nenhum dia registrado neste mês.</p>` : `
-          <div class="table-wrap stacked-rows">
-            <table>
-              <thead><tr><th>Dia</th><th>Uber</th><th>99</th><th>Total</th><th>Status</th><th></th></tr></thead>
-              <tbody>
-                ${diasMes.slice().reverse().map((d) => {
-                  const t = (d.uber || 0) + (d.app99 || 0);
-                  const dd = t - meta;
-                  return `
-                    <tr data-id="${d.id}">
-                      <td data-label="Dia">${fmtBR(d.data)}</td>
-                      <td class="num" data-label="Uber">${brl(d.uber)}</td>
-                      <td class="num" data-label="99">${brl(d.app99)}</td>
-                      <td class="num" data-label="Total"><strong>${brl(t)}</strong></td>
-                      <td data-label="Status">${dd >= 0 ? `<span class="badge pago">+${brl(dd)}</span>` : `<span class="badge pendente">−${brl(-dd)}</span>`}</td>
-                      <td class="actions"><button class="btn sm danger" data-action="rm-uber">×</button></td>
-                    </tr>`;
-                }).join("")}
-              </tbody>
-            </table>
+          ${diasMes.length === 0 ? `<p class="muted">Nenhum lançamento registrado neste mês.</p>` : `
+          <div class="uber-list">
+            ${diasMes.slice().reverse().map((d) => {
+              const t  = d.uber + d.app99;
+              const dd = t - meta;
+              const lancs = d.lancamentos.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+              return `
+                <article class="uber-day">
+                  <header class="uber-day-head">
+                    <div>
+                      <span class="uber-day-date">${fmtBR(d.data)}</span>
+                      <span class="badge ${dd >= 0 ? "pago" : "pendente"}">${dd >= 0 ? `+${brl(dd)}` : `−${brl(-dd)}`}</span>
+                    </div>
+                    <span class="uber-day-total">${brl(t)}</span>
+                  </header>
+                  <ul class="uber-entries">
+                    ${lancs.map((l) => `
+                      <li class="uber-entry" data-id="${l.id}">
+                        <div class="uber-entry-tags">
+                          ${(l.uber  || 0) > 0 ? `<span class="uber-tag uber">Uber · ${brl(l.uber)}</span>` : ""}
+                          ${(l.app99 || 0) > 0 ? `<span class="uber-tag app99">99 · ${brl(l.app99)}</span>` : ""}
+                        </div>
+                        <button class="btn sm danger" data-action="rm-uber" aria-label="Remover lançamento">×</button>
+                      </li>
+                    `).join("")}
+                  </ul>
+                </article>`;
+            }).join("")}
           </div>`}
         </article>
       </div>
@@ -1784,24 +1800,19 @@ function renderMeta(c) {
     const uber = Number(fd.get("uber") || 0);
     const app99 = Number(fd.get("app99") || 0);
     if (uber <= 0 && app99 <= 0) { toast("Informe pelo menos um valor."); return; }
-    const existing = state.uberDias.find((d) => d.data === data);
-    if (existing) {
-      existing.uber = (existing.uber || 0) + uber;
-      existing.app99 = (existing.app99 || 0) + app99;
-    } else {
-      state.uberDias.push({ id: uid(), data, uber, app99 });
-    }
+    state.uberDias.push({ id: uid(), data, uber, app99, ts: Date.now() });
     const partes = [];
     if (uber > 0)  partes.push(`Uber ${brl(uber)}`);
     if (app99 > 0) partes.push(`99 ${brl(app99)}`);
     saveState(); toast(`+ ${partes.join(" · ")} em ${fmtBR(data)}`); renderAll();
   });
 
-  document.querySelectorAll("#meta tr[data-id]").forEach((tr) => {
-    tr.querySelector("[data-action=rm-uber]").addEventListener("click", () => {
-      const id = tr.getAttribute("data-id");
+  document.querySelectorAll("#meta [data-id] [data-action=rm-uber]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.closest("[data-id]")?.getAttribute("data-id");
+      if (!id) return;
       state.uberDias = state.uberDias.filter((x) => x.id !== id);
-      saveState(); toast("Dia removido"); renderAll();
+      saveState(); toast("Lançamento removido"); renderAll();
     });
   });
 

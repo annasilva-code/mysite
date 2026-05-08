@@ -769,6 +769,82 @@ tbody tr:hover:not(.section) {
 .conta-foot { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 
 /* ===========================================
+   UBER/99 — lista de lançamentos
+   =========================================== */
+.uber-list {
+  display: flex; flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.uber-day {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+.uber-day-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.uber-day-head > div {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.uber-day-date {
+  font-weight: 600; font-size: 0.88rem;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+.uber-day-total {
+  font-family: var(--font-mono);
+  font-weight: 600; font-size: 0.95rem;
+  color: var(--text-strong);
+}
+.uber-entries {
+  list-style: none; margin: 0; padding: 0;
+}
+.uber-entry {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+.uber-entry:first-child { border-top: none; }
+.uber-entry-tags {
+  display: inline-flex; gap: 6px; flex-wrap: wrap;
+  flex: 1;
+}
+.uber-entry .btn { margin-left: auto; }
+
+.uber-tag {
+  display: inline-flex; align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--r-xs);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+.uber-tag.uber {
+  color: var(--text-strong);
+  background: var(--surface-2);
+}
+.uber-tag.app99 {
+  color: #b58a00;
+  background: rgba(230, 184, 0, 0.12);
+  border-color: rgba(230, 184, 0, 0.30);
+}
+[data-theme="dark"] .uber-tag.app99 {
+  color: #e6c768;
+  background: rgba(230, 184, 0, 0.16);
+  border-color: rgba(230, 184, 0, 0.30);
+}
+
+/* ===========================================
    STATES
    =========================================== */
 .muted { color: var(--muted); }
