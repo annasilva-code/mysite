@@ -331,7 +331,9 @@ input[type="number"] {
 /* ===========================================
    INPUTS
    =========================================== */
+input:not([type]),
 input[type="date"], input[type="number"], input[type="text"], input[type="month"],
+input[type="email"], input[type="search"], input[type="tel"], input[type="url"], input[type="password"],
 select, textarea {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
