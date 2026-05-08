@@ -1764,11 +1764,11 @@ function renderMeta(c) {
 
       <form id="form-uber" class="form-grid cols-meta" style="margin-top:14px;">
         <input name="data" type="date" required value="${state.referencia}" />
-        <input name="uber" type="number" min="0" step="0.01" placeholder="Uber" required />
-        <input name="app99" type="number" min="0" step="0.01" placeholder="99" required />
-        <button class="btn" type="submit">Salvar dia</button>
+        <input name="uber" type="number" min="0" step="0.01" placeholder="Uber (opcional)" />
+        <input name="app99" type="number" min="0" step="0.01" placeholder="99 (opcional)" />
+        <button class="btn primary" type="submit">+ Adicionar corrida</button>
       </form>
-      <p class="hint">Lança o ganho do dia. Se já existir, será atualizado.</p>
+      <p class="hint">Lance corrida por corrida — os valores vão <strong>somando no dia</strong>. Você pode preencher só Uber, só 99, ou os dois.</p>
     </section>
   `;
 
@@ -1783,13 +1783,18 @@ function renderMeta(c) {
     const data = fd.get("data");
     const uber = Number(fd.get("uber") || 0);
     const app99 = Number(fd.get("app99") || 0);
+    if (uber <= 0 && app99 <= 0) { toast("Informe pelo menos um valor."); return; }
     const existing = state.uberDias.find((d) => d.data === data);
     if (existing) {
-      existing.uber = uber; existing.app99 = app99;
+      existing.uber = (existing.uber || 0) + uber;
+      existing.app99 = (existing.app99 || 0) + app99;
     } else {
       state.uberDias.push({ id: uid(), data, uber, app99 });
     }
-    saveState(); toast("Dia salvo"); renderAll();
+    const partes = [];
+    if (uber > 0)  partes.push(`Uber ${brl(uber)}`);
+    if (app99 > 0) partes.push(`99 ${brl(app99)}`);
+    saveState(); toast(`+ ${partes.join(" · ")} em ${fmtBR(data)}`); renderAll();
   });
 
   document.querySelectorAll("#meta tr[data-id]").forEach((tr) => {
@@ -2375,6 +2380,87 @@ function renderAll() {
   renderMeta(c);
   renderReserva();
   renderConfig();
+  refreshMoneyInputs();
+}
+
+/* ---------- CURRENCY INPUTS (auto-format BRL "50,00") ---------- */
+
+const MONEY_NAMES = /^(valor|valorParcela|valorPago|valorMensal|uber|app99|saldoInicial)$/;
+
+function parseMoney(s) {
+  if (s == null) return 0;
+  if (typeof s === "number") return Number.isFinite(s) ? s : 0;
+  const cleaned = String(s).replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fmtMoneyBR(n) {
+  return Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function isMoneyInput(inp) {
+  if (!inp || inp.tagName !== "INPUT") return false;
+  if (inp.dataset.currency === "off") return false;
+  if (inp.dataset.currency === "on") return true;
+  return MONEY_NAMES.test(inp.name || "");
+}
+
+function prepareMoneyInput(inp) {
+  if (inp.type === "number") inp.type = "text";
+  if (!inp.inputMode) inp.inputMode = "decimal";
+  inp.setAttribute("autocomplete", "off");
+  if (inp.value !== "" && inp.value != null) {
+    const n = parseMoney(inp.value);
+    inp.value = n === 0 ? "" : fmtMoneyBR(n);
+  }
+}
+
+function setupCurrencyInputs() {
+  // Filtra digitação: só permite dígitos, vírgula e ponto
+  document.body.addEventListener("input", (e) => {
+    const inp = e.target;
+    if (!isMoneyInput(inp)) return;
+    const before = inp.value;
+    const sanitized = before.replace(/[^\d,.]/g, "");
+    if (sanitized !== before) inp.value = sanitized;
+  });
+
+  // Ao sair do campo, formata pra "X.XXX,XX"
+  document.body.addEventListener("focusout", (e) => {
+    const inp = e.target;
+    if (!isMoneyInput(inp)) return;
+    if (inp.value.trim() === "") return;
+    inp.value = fmtMoneyBR(parseMoney(inp.value));
+  });
+
+  // Ao entrar, mostra valor "limpo" (sem milhar) pra digitação fácil
+  document.body.addEventListener("focusin", (e) => {
+    const inp = e.target;
+    if (!isMoneyInput(inp)) return;
+    if (inp.value.trim() === "") return;
+    const n = parseMoney(inp.value);
+    inp.value = n === 0 ? "" : String(n).replace(".", ",");
+    requestAnimationFrame(() => inp.select?.());
+  });
+
+  // Antes de submit, normaliza pra string numérica que o handler já espera
+  document.body.addEventListener("submit", (e) => {
+    const form = e.target;
+    if (!form || !form.querySelectorAll) return;
+    form.querySelectorAll("input").forEach((inp) => {
+      if (isMoneyInput(inp)) inp.value = String(parseMoney(inp.value));
+    });
+  }, true);
+
+  // Aplica em inputs já presentes
+  refreshMoneyInputs();
+}
+
+function refreshMoneyInputs() {
+  document.querySelectorAll("input").forEach((inp) => {
+    if (isMoneyInput(inp)) prepareMoneyInput(inp);
+  });
 }
 
 /* ---------- THEME TOGGLE ---------- */
@@ -2425,3 +2511,4 @@ renderAll();
 setupTabs();
 setupThemeToggle();
 setupQuickFab();
+setupCurrencyInputs();

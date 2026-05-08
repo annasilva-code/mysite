@@ -331,15 +331,15 @@ input[type="number"] {
 /* ===========================================
    INPUTS
    =========================================== */
-input:not([type]),
-input[type="date"], input[type="number"], input[type="text"], input[type="month"],
-input[type="email"], input[type="search"], input[type="tel"], input[type="url"], input[type="password"],
+/* Pega qualquer input que NÃO seja um dos especiais (cor, checkbox, radio, file, range, submit, button, image, reset),
+   garantindo que <input> sem 'type' explícito também é estilizado. */
+input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="submit"]):not([type="button"]):not([type="image"]):not([type="reset"]),
 select, textarea {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: 9px 12px;
   font: inherit;
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--text-strong);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   font-size: 16px;  /* evita zoom iOS */
@@ -349,6 +349,19 @@ select, textarea {
 input[type="date"] { min-height: 42px; }
 
 input::placeholder, textarea::placeholder { color: var(--muted-2); }
+
+/* Override do autofill do Chrome/Safari (que pinta amarelo/branco) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
+  -webkit-text-fill-color: var(--text-strong) !important;
+  caret-color: var(--text-strong);
+  transition: background-color 9999s ease-in-out 0s;
+}
 
 input:focus, select:focus, textarea:focus {
   outline: none;
