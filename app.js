@@ -679,23 +679,38 @@ function renderContas(c) {
         <div class="conta-itens">
           ${itens.length === 0 ? `<p class="muted" style="margin:8px 0;">Nenhum item. Adicione abaixo.</p>` : `
           <table>
-            <thead><tr><th>Item</th><th>Parcela</th><th>Valor</th><th>Total</th><th>Pago</th><th>Falta</th><th></th></tr></thead>
+            <thead><tr><th>Item</th><th>Parcela</th><th>Valor</th><th>Pago</th><th>Pendente</th><th></th></tr></thead>
             <tbody>
               ${itens.map((it) => {
-                const totalItem = (it.valorParcela || 0) * (it.parcelasTotal || 1);
-                const abertoItem = Math.max(0, (it.valorParcela || 0) - (it.valorPago || 0));
+                const parcelaAtual = it.parcelaAtual || 1;
+                const parcelasTotal = it.parcelasTotal || 1;
+                const valorParcela = it.valorParcela || 0;
+                const parcelasJaPagas = Math.max(0, parcelaAtual - 1);
+                const pagoAcumulado = parcelasJaPagas * valorParcela + (it.valorPago || 0);
+                const totalItem = valorParcela * parcelasTotal;
+                const abertoItem = Math.max(0, totalItem - pagoAcumulado);
                 const itemPago = abertoItem === 0;
                 return `
                   <tr data-item="${it.id}" class="${itemPago ? "row-paid" : ""}">
                     <td data-label="Item">${escapeHtml(it.descricao || "Item")}</td>
-                    <td data-label="Parcela">${it.fixa ? `<span class="pill fixa" title="Conta fixa mensal">Mensal</span>` : `<span class="pill">${it.parcelaAtual || 1}/${it.parcelasTotal || 1}</span>`}</td>
-                    <td class="num" data-label="Valor">${brl(it.valorParcela)}</td>
-                    <td class="num muted" data-label="Total">${brl(totalItem)}</td>
-                    <td class="num" data-label="Pago">${brl(it.valorPago || 0)}</td>
-                    <td class="num" data-label="Falta"><strong class="${abertoItem > 0 ? "warn" : "ok"}">${brl(abertoItem)}</strong></td>
+                    <td data-label="Parcela">${it.fixa ? `<span class="pill fixa" title="Conta fixa mensal">Mensal</span>` : `<span class="pill">${parcelaAtual}/${parcelasTotal}</span>`}</td>
+                    <td class="num" data-label="Valor">${brl(valorParcela)}</td>
+                    <td class="num" data-label="Pago">${brl(pagoAcumulado)}</td>
+                    <td class="num" data-label="Pendente">
+                      <strong class="${abertoItem > 0 ? "warn" : "ok"}">${brl(abertoItem)}</strong>
+                      ${parcelasTotal > 1 ? `<div class="num-sub muted">de ${brl(totalItem)}</div>` : ""}
+                    </td>
                     <td class="actions">
-                      ${!itemPago ? `<button class="btn sm success" data-act="quit-item">Pagar</button>` : `<button class="btn sm ghost" data-act="reabrir-item">Reabrir</button>`}
-                      <button class="btn sm ghost" data-act="parc-item">Parcial</button>
+                      ${itemPago ? `
+                        <button class="btn sm ghost" data-act="reabrir-item">Reabrir</button>
+                      ` : it.fixa ? `
+                        <button class="btn sm success" data-act="pagar-todas">Pagar</button>
+                        <button class="btn sm ghost" data-act="parc-item">Parcial</button>
+                      ` : `
+                        <button class="btn sm success" data-act="pagar-parcela">Pagar parcela</button>
+                        <button class="btn sm ghost" data-act="parc-item">Parcial</button>
+                        <button class="btn sm success" data-act="pagar-todas">Pagar todas</button>
+                      `}
                       <button class="btn sm ghost" data-act="edit-item">Editar</button>
                       <button class="btn sm danger" data-act="rm-item">×</button>
                     </td>
@@ -961,27 +976,59 @@ function bindContas() {
       const item = (conta.itens || []).find((i) => i.id === itemId);
       if (!item) return;
       tr.querySelectorAll("[data-act]").forEach((btn) => {
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", async () => {
           const act = btn.getAttribute("data-act");
-          if (act === "quit-item") {
+
+          if (act === "pagar-parcela") {
+            // Pago essa parcela inteira → avança pra próxima (ou quita se for a última)
+            const atual = item.parcelaAtual || 1;
+            const total = item.parcelasTotal || 1;
+            if (atual >= total) {
+              item.valorPago = item.valorParcela;
+              toast("Última parcela paga · item quitado");
+            } else {
+              item.parcelaAtual = atual + 1;
+              item.valorPago = 0;
+              toast(`Parcela ${atual} paga · agora ${item.parcelaAtual}/${total}`);
+            }
+
+          } else if (act === "pagar-todas") {
+            item.parcelaAtual = item.parcelasTotal || 1;
             item.valorPago = item.valorParcela;
-            toast("Item pago");
+            toast(item.fixa ? "Item pago" : "Todas as parcelas pagas");
+
           } else if (act === "reabrir-item") {
             item.valorPago = 0;
             toast("Item reaberto");
+
           } else if (act === "parc-item") {
             const aberto = Math.max(0, (item.valorParcela || 0) - (item.valorPago || 0));
-            const v = Number(prompt(`Quanto pagar agora em "${item.descricao}"? (em aberto: ${brl(aberto)})`, "0"));
-            if (!Number.isFinite(v) || v <= 0) return;
+            const v = await openDialog({
+              title: "Pagamento parcial",
+              message: `${item.descricao} — em aberto nesta parcela: ${brl(aberto)}`,
+              confirmText: "Confirmar pagamento"
+            });
+            if (v == null || v <= 0) return;
             item.valorPago = Math.min(item.valorParcela, (item.valorPago || 0) + v);
-            toast("Pagamento parcial registrado");
+            // Se completou a parcela e não é a última, avança
+            if (!item.fixa && item.valorPago >= item.valorParcela && (item.parcelaAtual || 1) < (item.parcelasTotal || 1)) {
+              item.parcelaAtual = (item.parcelaAtual || 1) + 1;
+              item.valorPago = 0;
+              toast("Parcial completou a parcela · avançou pra próxima");
+            } else {
+              toast("Pagamento parcial registrado");
+            }
+
           } else if (act === "edit-item") {
-            showFormItem(contaId, item); return;
+            showFormItem(contaId, item);
+            return;
+
           } else if (act === "rm-item") {
             if (!confirm(`Remover "${item.descricao}"?`)) return;
             conta.itens = conta.itens.filter((i) => i.id !== itemId);
             toast("Item removido");
           }
+
           conta.status = valorAbertoConta(conta) === 0 ? "pago" : "pendente";
           saveState(); renderAll();
         });
@@ -2392,6 +2439,64 @@ function renderAll() {
   renderReserva();
   renderConfig();
   refreshMoneyInputs();
+}
+
+/* ---------- DIALOG (substitui prompt/confirm) ---------- */
+
+function openDialog({ title, message, defaultValue = "", confirmText = "Confirmar", showInput = true }) {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById("dialog");
+    if (!dlg) { resolve(null); return; }
+
+    dlg.querySelector("#dialog-title").textContent = title || "";
+    dlg.querySelector("#dialog-msg").textContent = message || "";
+    dlg.querySelector("#dialog-confirm").textContent = confirmText;
+
+    const wrap = dlg.querySelector("#dialog-input-wrap");
+    const input = dlg.querySelector("#dialog-input");
+    wrap.style.display = showInput ? "" : "none";
+
+    if (showInput) {
+      // defaultValue pode vir como número (cents → "X,XX") ou string já formatada
+      let initial = "";
+      if (typeof defaultValue === "number" && defaultValue > 0) {
+        initial = fmtMoneyBR(defaultValue);
+      } else if (typeof defaultValue === "string" && defaultValue) {
+        initial = defaultValue;
+      }
+      input.value = initial;
+    }
+
+    const cancelBtns = dlg.querySelectorAll("[data-dialog-cancel]");
+    const confirmBtn = dlg.querySelector("#dialog-confirm");
+
+    const cleanup = () => {
+      dlg.classList.remove("open");
+      cancelBtns.forEach((b) => b.removeEventListener("click", onCancel));
+      confirmBtn.removeEventListener("click", onConfirm);
+      input.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onEsc);
+    };
+    const onCancel = () => { cleanup(); resolve(null); };
+    const onConfirm = () => {
+      const raw = input.value;
+      const num = showInput ? parseMoney(raw) : null;
+      cleanup();
+      resolve(showInput ? num : true);
+    };
+    const onKey = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); onConfirm(); }
+    };
+    const onEsc = (e) => { if (e.key === "Escape") onCancel(); };
+
+    cancelBtns.forEach((b) => b.addEventListener("click", onCancel));
+    confirmBtn.addEventListener("click", onConfirm);
+    input.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onEsc);
+
+    dlg.classList.add("open");
+    if (showInput) requestAnimationFrame(() => { input.focus(); input.select(); });
+  });
 }
 
 /* ---------- CURRENCY INPUTS (auto-format BRL "50,00") ---------- */

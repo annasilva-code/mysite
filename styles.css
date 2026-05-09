@@ -536,6 +536,15 @@ tr.section td {
 }
 
 td.num { text-align: right; }
+.num-sub {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 400;
+  margin-top: 2px;
+  letter-spacing: 0;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
 td.actions { white-space: nowrap; text-align: right; }
 td.actions .btn { margin-left: 4px; }
 
@@ -767,6 +776,66 @@ tbody tr:hover:not(.section) {
 .conta-itens { margin-top: 10px; }
 .conta-itens table { font-size: 0.85rem; min-width: 480px; }
 .conta-foot { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+
+/* ===========================================
+   DIALOG (substitui prompt/confirm nativos)
+   =========================================== */
+.dialog {
+  position: fixed; inset: 0;
+  z-index: 300;
+  pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.dialog-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(10, 9, 8, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.dialog-panel {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 22px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(8px) scale(0.98);
+  opacity: 0;
+  transition: transform 0.24s cubic-bezier(.32, .72, 0, 1), opacity 0.18s ease;
+}
+.dialog.open                  { pointer-events: auto; }
+.dialog.open .dialog-backdrop { opacity: 1; }
+.dialog.open .dialog-panel    { transform: none; opacity: 1; }
+
+.dialog-title {
+  margin: 0 0 6px;
+  font-size: 1.05rem; font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+.dialog-msg {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  letter-spacing: -0.005em;
+}
+.dialog-input-wrap { margin-bottom: 18px; }
+.dialog-input { width: 100%; }
+.dialog-actions {
+  display: flex; justify-content: flex-end;
+  gap: 8px;
+}
+.dialog-actions .btn { min-width: 100px; }
+
+@media (max-width: 600px) {
+  .dialog-panel { padding: 18px; }
+  .dialog-actions .btn { flex: 1; min-width: 0; }
+}
 
 /* ===========================================
    UBER/99 — lista de lançamentos

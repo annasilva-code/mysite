@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body>
   <main class="container">
@@ -79,6 +79,23 @@
   </div>
 
   <div id="theme-ripple" class="theme-ripple" aria-hidden="true"></div>
+
+  <!-- Dialog reutilizável (substitui prompt/confirm nativos) -->
+  <div class="dialog" id="dialog" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="dialog-backdrop" data-dialog-cancel></div>
+    <div class="dialog-panel">
+      <h3 class="dialog-title" id="dialog-title"></h3>
+      <p class="dialog-msg" id="dialog-msg"></p>
+      <div class="dialog-input-wrap" id="dialog-input-wrap">
+        <input class="dialog-input" id="dialog-input" type="text" inputmode="decimal"
+               placeholder="0,00" data-currency="on" autocomplete="off" />
+      </div>
+      <div class="dialog-actions">
+        <button class="btn ghost" type="button" data-dialog-cancel>Cancelar</button>
+        <button class="btn primary" type="button" id="dialog-confirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Bottom nav (mobile) — 4 principais + Mais -->
   <nav class="bottom-nav" aria-label="Navegação inferior">
@@ -214,6 +231,6 @@
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
