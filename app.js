@@ -959,11 +959,15 @@ function renderContas(c) {
                 const totalItem = valorParcela * parcelasTotal;
                 const abertoItem = Math.max(0, totalItem - pagoAcumulado);
                 const paidThisMonth = (it.valorPago || 0) >= valorParcela && valorParcela > 0;
-                const itemFinalizado = parcelaAtual >= parcelasTotal && paidThisMonth;
+                const isPartial = (it.valorPago || 0) > 0 && (it.valorPago || 0) < valorParcela;
+                const restanteParcela = Math.max(0, valorParcela - (it.valorPago || 0));
                 return `
                   <tr data-item="${it.id}" class="${paidThisMonth ? "row-paid" : ""}">
                     <td data-label="Item">${escapeHtml(it.descricao || "Item")}</td>
-                    <td data-label="Parcela">${it.fixa ? `<span class="pill fixa" title="Conta fixa mensal">Mensal</span>` : `<span class="pill">${parcelaAtual}/${parcelasTotal}</span>`}</td>
+                    <td data-label="Parcela">
+                      ${it.fixa ? `<span class="pill fixa" title="Conta fixa mensal">Mensal</span>` : `<span class="pill">${parcelaAtual}/${parcelasTotal}</span>`}
+                      ${isPartial ? `<div class="num-sub warn">faltam ${brl(restanteParcela)}</div>` : ""}
+                    </td>
                     <td class="num" data-label="Valor">${brl(valorParcela)}</td>
                     <td class="num" data-label="Pago">${brl(pagoAcumulado)}</td>
                     <td class="num" data-label="Pendente">
@@ -1091,11 +1095,21 @@ function renderContas(c) {
           <input type="checkbox" name="fixa" />
           Conta fixa mensal (sem parcelas)
         </label>
-        <input name="descricao" placeholder="Descrição (ex: Aluguel, Tablet)" required maxlength="60" />
-        <input name="parcelaAtual" type="number" min="1" step="1" placeholder="Parc. atual" data-parcela />
-        <input name="parcelasTotal" type="number" min="1" step="1" placeholder="Parc. total" data-parcela />
-        <input name="valorParcela" type="number" min="0.01" step="0.01" placeholder="Valor parcela" required />
-        <input name="valorPago" type="number" min="0" step="0.01" placeholder="Pago (parcial)" value="0" />
+        <label class="field-stack"><span class="label">Descrição</span>
+          <input name="descricao" placeholder="ex: Aluguel, Tablet" required maxlength="60" />
+        </label>
+        <label class="field-stack" data-parcela><span class="label">Parc. atual</span>
+          <input name="parcelaAtual" type="number" min="1" step="1" placeholder="1" />
+        </label>
+        <label class="field-stack" data-parcela><span class="label">Parc. total</span>
+          <input name="parcelasTotal" type="number" min="1" step="1" placeholder="12" />
+        </label>
+        <label class="field-stack"><span class="label">Valor da parcela</span>
+          <input name="valorParcela" type="number" min="0.01" step="0.01" placeholder="0,00" required />
+        </label>
+        <label class="field-stack"><span class="label">Pago (parcial)</span>
+          <input name="valorPago" type="number" min="0" step="0.01" placeholder="0,00" value="0" />
+        </label>
         <button class="btn" type="submit">Salvar item</button>
       </form>
       <p class="hint">Marque <strong>fixa</strong> pra contas que repetem todo mês (aluguel, energia). Desmarque pra parcelas (ex: tablet 11/12 R$ 50).</p>
@@ -1195,9 +1209,12 @@ function bindContas() {
     formItem.classList.toggle("is-fixa", fixa);
     formItem.querySelectorAll("[data-parcela]").forEach((el) => {
       el.style.display = fixa ? "none" : "";
-      el.required = !fixa;
+      // Procura input dentro do label e atualiza required
+      const inp = el.querySelector("input");
+      if (inp) inp.required = !fixa;
     });
-    formItem.valorParcela.placeholder = fixa ? "Valor mensal" : "Valor parcela";
+    const labelValor = formItem.querySelector('input[name="valorParcela"]');
+    if (labelValor) labelValor.placeholder = fixa ? "0,00 (mensal)" : "0,00";
   };
   formItem.fixa.addEventListener("change", toggleFixa);
 
@@ -1208,8 +1225,8 @@ function bindContas() {
     formItem.fixa.checked = item ? !!item.fixa : true;
     formItem.parcelaAtual.value = item?.parcelaAtual || 1;
     formItem.parcelasTotal.value = item?.parcelasTotal || 1;
-    formItem.valorParcela.value = item?.valorParcela || "";
-    formItem.valorPago.value = item?.valorPago || 0;
+    formItem.valorParcela.value = item?.valorParcela ? fmtMoneyBR(item.valorParcela) : "";
+    formItem.valorPago.value    = item?.valorPago    ? fmtMoneyBR(item.valorPago)    : "";
     toggleFixa();
     panelItem.style.display = "block";
     panelItem.scrollIntoView({ behavior: "smooth", block: "start" });
