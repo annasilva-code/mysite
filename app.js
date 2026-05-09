@@ -283,6 +283,14 @@ function loadState() {
       state.caixa = (state.caixa || []).map((x) => ({ ...x, valor: 0 }));
       state.migrations.push("zeroCaixa-1");
     }
+    // Migração: categorias com nome de combustível ganham flag eCombustivel
+    if (!state.migrations.includes("eCombustivel-1")) {
+      state.categorias = (state.categorias || []).map((c) => ({
+        ...c,
+        eCombustivel: typeof c.eCombustivel === "boolean" ? c.eCombustivel : /gasolina|combust|posto/i.test(c.nome || "")
+      }));
+      state.migrations.push("eCombustivel-1");
+    }
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -1909,8 +1917,8 @@ function corDaCategoria(nome) {
 
 function renderCombustivel() {
   const el = document.getElementById("combustivel");
-  // Considera tanto registros em state.gasolina quanto movimentos com categoria flagada como excluída
-  const isCatComb = (nome) => state.categorias.some((c) => c.nome === nome && c.excluirDoLimite);
+  // Considera tanto registros em state.gasolina quanto movimentos com categoria marcada como combustível
+  const isCatComb = (nome) => state.categorias.some((c) => c.nome === nome && c.eCombustivel);
   const movsComb = state.movimentacoes
     .filter((m) => m.tipo === "Gasto" && isCatComb(m.categoria))
     .map((m) => ({ id: m.id, data: m.data, descricao: m.descricao, valor: m.valor, fonte: "mov" }));
@@ -2589,18 +2597,24 @@ function renderConfig() {
 
       <div class="table-wrap" style="margin-top:12px;">
         <table>
-          <thead><tr><th>Cor</th><th>Nome</th><th>Fora do limite</th><th></th></tr></thead>
+          <thead><tr><th>Cor</th><th>Nome</th><th>Fora do limite</th><th>Combustível</th><th></th></tr></thead>
           <tbody>
             ${state.categorias.map((c) => `
               <tr data-id="${c.id}">
                 <td><input type="color" data-field="cor" value="${c.cor || "#2f7d32"}" /></td>
                 <td><input class="inline-input" data-field="nome" value="${escapeAttr(c.nome)}" /></td>
-                <td><label style="display:inline-flex; align-items:center; gap:6px;"><input type="checkbox" data-field="excluirDoLimite" ${c.excluirDoLimite ? "checked" : ""} /> <span class="muted">não conta no R$ ${state.config.limiteMensal}</span></label></td>
+                <td><label style="display:inline-flex; align-items:center; gap:6px;"><input type="checkbox" data-field="excluirDoLimite" ${c.excluirDoLimite ? "checked" : ""} /> <span class="muted">não conta no limite</span></label></td>
+                <td><label style="display:inline-flex; align-items:center; gap:6px;"><input type="checkbox" data-field="eCombustivel" ${c.eCombustivel ? "checked" : ""} /> <span class="muted">aparece em Combustível</span></label></td>
                 <td class="actions"><button class="btn sm danger" data-action="rm-cat">×</button></td>
               </tr>`).join("")}
           </tbody>
         </table>
       </div>
+      <p class="hint">
+        <strong>Fora do limite</strong>: gasto não entra na conta dos R$ ${state.config.limiteMensal}/mês.
+        <strong>Combustível</strong>: aparece na aba Combustível e é monitorado por semana.
+        Os dois são independentes — Reserva pode estar "fora do limite" sem ser combustível.
+      </p>
     </section>
 
     <section class="panel">
@@ -2713,7 +2727,7 @@ function renderConfig() {
         const cat = state.categorias.find((c) => c.id === id);
         if (!cat) return;
         const f = inp.getAttribute("data-field");
-        if (f === "excluirDoLimite") cat[f] = inp.checked;
+        if (inp.type === "checkbox") cat[f] = inp.checked;
         else cat[f] = inp.value;
         saveState(); renderAll();
       });
