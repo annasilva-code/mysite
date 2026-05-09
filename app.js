@@ -1381,7 +1381,10 @@ function renderCaixa(c) {
           <h2 class="panel-title">Fontes de caixa</h2>
           <p class="panel-sub">Saldo atualiza sozinho conforme você lança entradas e gastos</p>
         </div>
-        <button class="btn ghost" id="add-caixa" type="button">+ Nova fonte</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn ghost" id="btn-transfer" type="button">↗ Transferir</button>
+          <button class="btn ghost" id="add-caixa" type="button">+ Nova fonte</button>
+        </div>
       </div>
 
       <div class="kpi-grid">
@@ -1467,6 +1470,8 @@ function renderCaixa(c) {
       </div>`}
     </section>
   `;
+
+  document.getElementById("btn-transfer")?.addEventListener("click", openTransferSheet);
 
   document.getElementById("add-caixa").addEventListener("click", () => {
     const f = document.getElementById("form-caixa");
@@ -2895,7 +2900,7 @@ function setupTabs() {
   document.getElementById("mobile-more-backdrop")?.addEventListener("click", closeMobileMore);
   // Esc fecha drawer e quick sheet
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closeMobileMore(); closeQuickSheet(); }
+    if (e.key === "Escape") { closeMobileMore(); closeQuickSheet(); closeTransferSheet(); }
   });
 }
 
@@ -3001,6 +3006,127 @@ function setupQuickFab() {
       fonteId: fd.get("fonteId") || ""
     });
     closeQuickSheet();
+  });
+}
+
+/* ---------- TRANSFER ENTRE FONTES ---------- */
+
+// Taxa padrão por fonte (Uber=4.50, 99=1.00); 0 se não tem
+function taxaPadraoFonte(fonteId) {
+  const f = state.caixa.find((x) => x.id === fonteId);
+  if (!f) return 0;
+  if (/uber/i.test(f.local || "")) return 4.50;
+  if (/99/.test(f.local || "")) return 1.00;
+  return 0;
+}
+
+function openTransferSheet() {
+  const sheet = document.getElementById("transfer-sheet");
+  const form = document.getElementById("transfer-form");
+  if (!sheet || !form) return;
+
+  // Defaults: De = primeira fonte com taxa (Uber/99 se houver), Para = Santander (ou primeira diferente)
+  const fontesComTaxa = state.caixa.filter((f) => taxaPadraoFonte(f.id) > 0);
+  const defaultFromId = fontesComTaxa[0]?.id || state.caixa[0]?.id || "";
+  const defaultToId   = state.caixa.find((f) => f.id === SANT_ID)?.id
+                      || state.caixa.find((f) => f.id !== defaultFromId)?.id
+                      || "";
+
+  form.from.innerHTML = fonteOptions(defaultFromId);
+  form.to.innerHTML   = fonteOptions(defaultToId);
+  form.data.value     = state.referencia || todayISO();
+  form.valor.value    = "";
+
+  updateTransferTax();
+  sheet.classList.add("open");
+  setTimeout(() => form.valor.focus(), 280);
+}
+
+function closeTransferSheet() {
+  document.getElementById("transfer-sheet")?.classList.remove("open");
+}
+
+function updateTransferTax() {
+  const form = document.getElementById("transfer-form");
+  if (!form) return;
+  const fromId = form.from.value;
+  const taxa = taxaPadraoFonte(fromId);
+  const checkbox = document.getElementById("transfer-cobrar-taxa");
+  const taxaInput = form.taxa;
+  const taxaWrap = form.querySelector(".qf-tax-wrap");
+  const hint = document.getElementById("transfer-tax-hint");
+
+  if (taxa > 0) {
+    const fonteNome = state.caixa.find((x) => x.id === fromId)?.local || "";
+    if (hint) hint.textContent = `(taxa padrão de ${fonteNome}: ${brl(taxa)})`;
+    checkbox.checked = true;
+    taxaInput.value = fmtMoneyBR(taxa);
+    if (taxaWrap) taxaWrap.style.display = "";
+  } else {
+    if (hint) hint.textContent = "";
+    checkbox.checked = false;
+    taxaInput.value = "";
+    if (taxaWrap) taxaWrap.style.display = "none";
+  }
+}
+
+function setupTransfer() {
+  const form = document.getElementById("transfer-form");
+  if (!form) return;
+
+  document.getElementById("transfer-sheet-backdrop")?.addEventListener("click", closeTransferSheet);
+  form.from.addEventListener("change", updateTransferTax);
+
+  const checkbox = document.getElementById("transfer-cobrar-taxa");
+  checkbox.addEventListener("change", () => {
+    const wrap = form.querySelector(".qf-tax-wrap");
+    if (wrap) wrap.style.display = checkbox.checked ? "" : "none";
+    if (!checkbox.checked) form.taxa.value = "";
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const fromId = fd.get("from");
+    const toId   = fd.get("to");
+    const valor  = Number(fd.get("valor") || 0);
+    const data   = fd.get("data") || todayISO();
+    const cobrarTaxa = !!fd.get("cobrarTaxa");
+    const taxa = cobrarTaxa ? Number(fd.get("taxa") || 0) : 0;
+
+    if (!fromId || !toId) { toast("Escolha origem e destino"); return; }
+    if (fromId === toId)  { toast("Origem e destino devem ser diferentes"); return; }
+    if (valor <= 0)       { toast("Informe o valor"); return; }
+
+    const from = state.caixa.find((x) => x.id === fromId);
+    const to   = state.caixa.find((x) => x.id === toId);
+    if (!from || !to) { toast("Fonte inválida"); return; }
+
+    // Mov 1: saída na origem (transferência)
+    state.movimentacoes.unshift({
+      id: uid(), tipo: "Gasto", categoria: "",
+      data, descricao: `Transferência → ${to.local}`,
+      valor, fonteId: fromId, origem: "transfer"
+    });
+    // Mov 2: entrada no destino
+    state.movimentacoes.unshift({
+      id: uid(), tipo: "Entrada", categoria: "",
+      data, descricao: `Transferência ← ${from.local}`,
+      valor, fonteId: toId, origem: "transfer"
+    });
+    // Mov 3: taxa (se aplicável) — sai da origem também
+    if (taxa > 0) {
+      state.movimentacoes.unshift({
+        id: uid(), tipo: "Gasto", categoria: "",
+        data, descricao: `Taxa de transferência (${from.local})`,
+        valor: taxa, fonteId: fromId, origem: "transfer-taxa"
+      });
+    }
+
+    saveState();
+    closeTransferSheet();
+    toast(`Transferido ${brl(valor)} ${from.local} → ${to.local}${taxa > 0 ? ` · taxa ${brl(taxa)}` : ""}`);
+    renderAll();
   });
 }
 
@@ -3223,6 +3349,7 @@ renderAll();
 setupTabs();
 setupThemeToggle();
 setupQuickFab();
+setupTransfer();
 setupCurrencyInputs();
 if (reabertas > 0) {
   setTimeout(() => toast(`${reabertas} parcela(s) abertas pra este mês`), 400);

@@ -151,6 +151,45 @@
     </svg>
   </button>
 
+  <!-- Sheet: transferir entre fontes -->
+  <div class="quick-sheet" id="transfer-sheet" aria-hidden="true" role="dialog" aria-label="Transferir entre fontes">
+    <div class="quick-sheet-backdrop" id="transfer-sheet-backdrop"></div>
+    <div class="quick-sheet-panel">
+      <div class="quick-sheet-handle" aria-hidden="true"></div>
+      <h3 class="quick-sheet-title">Transferir entre fontes</h3>
+
+      <form id="transfer-form" class="quick-form">
+        <label class="qf-field qf-half">
+          <span class="label">De</span>
+          <select name="from" required></select>
+        </label>
+        <label class="qf-field qf-half">
+          <span class="label">Para</span>
+          <select name="to" required></select>
+        </label>
+        <label class="qf-field qf-half">
+          <span class="label">Valor</span>
+          <input name="valor" type="text" inputmode="decimal" data-currency="on" required placeholder="0,00" />
+        </label>
+        <label class="qf-field qf-half">
+          <span class="label">Data</span>
+          <input name="data" type="date" required />
+        </label>
+        <label class="qf-field check-line full" style="grid-column:1/-1;">
+          <input type="checkbox" name="cobrarTaxa" id="transfer-cobrar-taxa" />
+          <span>Cobrar taxa de transferência <span id="transfer-tax-hint" class="muted" style="font-size:0.78rem;"></span></span>
+        </label>
+        <label class="qf-field qf-tax-wrap">
+          <span class="label">Valor da taxa</span>
+          <input name="taxa" type="text" inputmode="decimal" data-currency="on" placeholder="0,00" />
+        </label>
+        <div class="qf-field qf-half qf-actions">
+          <button class="btn primary qf-submit" type="submit">Transferir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Sheet: lançar entrada/gasto rápido -->
   <div class="quick-sheet" id="quick-sheet" aria-hidden="true" role="dialog" aria-label="Lançar movimentação">
     <div class="quick-sheet-backdrop" id="quick-sheet-backdrop"></div>
@@ -231,6 +270,6 @@
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
