@@ -329,15 +329,17 @@ function updateSyncStatus(msg, level) {
 }
 
 async function ghFetch(token, path, opts = {}) {
-  const res = await fetch(`https://api.github.com${path}`, {
-    ...opts,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      ...(opts.headers || {})
-    }
-  });
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    ...(opts.headers || {})
+  };
+  // Sempre que tiver body (POST/PATCH/PUT), define Content-Type pra JSON
+  if (opts.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(`https://api.github.com${path}`, { ...opts, headers });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`GitHub ${res.status}: ${txt.slice(0, 200)}`);
