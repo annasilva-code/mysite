@@ -2000,12 +2000,9 @@ function renderCombustivel() {
         </div>
       </div>
 
-      <form id="form-combustivel" class="form-grid cols-gasolina" style="margin-top:8px;">
-        <input name="data" type="date" required value="${state.referencia}" />
-        <input name="descricao" placeholder="Descrição (ex: posto Shell)" maxlength="50" />
-        <input name="valor" type="number" min="0.01" step="0.01" required placeholder="Valor" />
-        <button class="btn" type="submit">Registrar abastecimento</button>
-      </form>
+      <p class="hint" style="margin-top:8px;">
+        Pra registrar um abastecimento, lance um <strong>gasto normal</strong> (Resumo → Lançar movimentação ou FAB) com categoria marcada como <strong>Combustível</strong> em <a href="#" data-tab="config" style="color:var(--accent);">Categorias</a>. Ele aparece aqui automático.
+      </p>
     </section>
 
     <section class="panel">
@@ -2038,19 +2035,6 @@ function renderCombustivel() {
       </div>`}
     </section>
   `;
-
-  document.getElementById("form-combustivel").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    if (!state.gasolina) state.gasolina = [];
-    state.gasolina.push({
-      id: uid(),
-      data: fd.get("data") || todayISO(),
-      descricao: String(fd.get("descricao") || "").trim(),
-      valor: Number(fd.get("valor") || 0)
-    });
-    saveState(); toast("Abastecimento registrado"); renderAll();
-  });
 
   document.querySelectorAll("#combustivel tr[data-id]").forEach((tr) => {
     tr.querySelector("[data-action=rm-comb]").addEventListener("click", () => {
