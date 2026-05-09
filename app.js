@@ -2442,9 +2442,30 @@ function renderConfig() {
         <span></span><span></span>
         <label>
           <span class="label">Limpar tudo</span>
-          <button class="btn danger" id="reset-all">Resetar dados</button>
+          <button class="btn danger" id="reset-all" type="button">Resetar dados</button>
         </label>
       </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Sincronizar entre dispositivos</h2>
+          <p class="panel-sub">Os dados ficam só neste navegador. Pra usar no celular, baixe um backup aqui e importe lá.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn ghost" id="btn-backup" type="button">↓ Baixar backup (.json)</button>
+        <label class="btn ghost" for="btn-restore-input" style="cursor:pointer; display:inline-flex; align-items:center;">
+          ↑ Restaurar backup
+          <input type="file" id="btn-restore-input" accept="application/json,.json" hidden />
+        </label>
+      </div>
+      <p class="hint">
+        <strong>No PC</strong>: clica em <em>Baixar backup</em> — gera um arquivo <code>caua-backup-YYYY-MM-DD.json</code>.
+        Manda esse arquivo pro celular (WhatsApp, AirDrop, email).
+        <strong>No celular</strong>: abre o site, vai em Categorias, clica <em>Restaurar backup</em> e seleciona o arquivo. Substitui tudo pelo backup.
+      </p>
     </section>
   `;
 
@@ -2493,6 +2514,53 @@ function renderConfig() {
     localStorage.removeItem(STORAGE_KEY);
     state = clone(DEFAULT_STATE);
     saveState(); toast("Dados resetados"); renderAll();
+  });
+
+  // Backup: baixa JSON com todo o estado
+  document.getElementById("btn-backup").addEventListener("click", () => {
+    const payload = {
+      _app: "lord-caua-painel",
+      _version: 1,
+      _exportedAt: new Date().toISOString(),
+      state: state
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `caua-backup-${todayISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("Backup baixado");
+  });
+
+  // Restore: importa JSON e substitui o state
+  document.getElementById("btn-restore-input").addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const obj = JSON.parse(reader.result);
+        const incoming = obj?.state && obj?._app === "lord-caua-painel" ? obj.state : obj;
+        if (!incoming || typeof incoming !== "object") throw new Error("formato inválido");
+        if (!confirm("Isso vai SUBSTITUIR todos os dados deste navegador pelo backup. Confirmar?")) {
+          e.target.value = "";
+          return;
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(incoming));
+        toast("Backup restaurado");
+        setTimeout(() => location.reload(), 600);
+      } catch (err) {
+        toast("Arquivo inválido");
+        console.error(err);
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
   });
 
   // Color picker — cor de destaque
