@@ -392,7 +392,7 @@ select option { background: var(--surface); color: var(--text); }
 .form-grid.cols-receber      { grid-template-columns: 1fr 110px 110px 130px 140px 120px 120px; }
 .form-grid.cols-conta-item   { grid-template-columns: 1fr 90px 90px 130px 110px 110px; }
 .form-grid.cols-conta-item.is-fixa { grid-template-columns: 1fr 130px 110px 110px; }
-.form-grid.cols-conta        { grid-template-columns: 1fr 140px 160px 70px 130px; }
+.form-grid.cols-conta        { grid-template-columns: 1fr 130px 130px 130px 70px 130px; }
 .form-grid.cols-categoria    { grid-template-columns: 1fr 140px 140px; }
 .form-grid.cols-caixa        { grid-template-columns: 1fr 160px 70px 130px; }
 .form-grid.cols-meta         { grid-template-columns: 130px 130px 130px 130px; }

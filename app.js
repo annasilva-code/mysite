@@ -19,7 +19,7 @@ const DEFAULT_STATE = {
   contas: [
     {
       id: uid(), descricao: "Cartão tia", grupo: "tia",
-      vencimento: "2026-05-10", prioridade: 1, status: "pendente",
+      diaVencimento: 10, diaAbertura: 16, prioridade: 1, status: "pendente",
       cor: "#a06a48",
       itens: [
         { id: uid(), descricao: "Compra exemplo", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 331.24, valorPago: 0 }
@@ -27,25 +27,25 @@ const DEFAULT_STATE = {
     },
     {
       id: uid(), descricao: "Aluguel", grupo: "outras",
-      vencimento: "2026-05-10", prioridade: 2, status: "pendente",
+      diaVencimento: 10, diaAbertura: 1, prioridade: 2, status: "pendente",
       cor: "#ff5564",
       itens: [{ id: uid(), descricao: "Mensal", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 500.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Energia", grupo: "outras",
-      vencimento: "2026-05-10", prioridade: 3, status: "pendente",
+      diaVencimento: 10, diaAbertura: 1, prioridade: 3, status: "pendente",
       cor: "#ff9a3c",
       itens: [{ id: uid(), descricao: "Mensal", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 125.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Internet", grupo: "outras",
-      vencimento: "2026-05-10", prioridade: 4, status: "pendente",
+      diaVencimento: 10, diaAbertura: 1, prioridade: 4, status: "pendente",
       cor: "#5ee2ff",
       itens: [{ id: uid(), descricao: "Mensal", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 31.0, valorPago: 0 }]
     },
     {
       id: uid(), descricao: "Dentista", grupo: "outras",
-      vencimento: "2026-05-15", prioridade: 5, status: "pendente",
+      diaVencimento: 15, diaAbertura: 1, prioridade: 5, status: "pendente",
       cor: "#4ade80",
       itens: [{ id: uid(), descricao: "Sessão", fixa: true, parcelaAtual: 1, parcelasTotal: 1, valorParcela: 75.0, valorPago: 0 }]
     }
@@ -260,13 +260,23 @@ function loadState() {
     state = { ...clone(DEFAULT_STATE), ...saved };
     state.config = { ...DEFAULT_STATE.config, ...(saved.config || {}) };
     state.reservaConfig = { ...DEFAULT_STATE.reservaConfig, ...(saved.reservaConfig || {}) };
-    state.contas = (state.contas || []).map((c) => ({
-      ...c,
-      itens: (c.itens || []).map((it) => ({
-        ...it,
-        fixa: typeof it.fixa === "boolean" ? it.fixa : (!it.parcelasTotal || it.parcelasTotal <= 1)
-      }))
-    }));
+    state.contas = (state.contas || []).map((c) => {
+      // Migra vencimento "YYYY-MM-DD" → diaVencimento (1-31)
+      let diaVenc = c.diaVencimento;
+      if (!diaVenc && c.vencimento) {
+        const parts = String(c.vencimento).split("-");
+        diaVenc = Number(parts[2]) || 10;
+      }
+      return {
+        ...c,
+        diaVencimento: diaVenc || 10,
+        diaAbertura: c.diaAbertura || 1,
+        itens: (c.itens || []).map((it) => ({
+          ...it,
+          fixa: typeof it.fixa === "boolean" ? it.fixa : (!it.parcelasTotal || it.parcelasTotal <= 1)
+        }))
+      };
+    });
     // Migrações pontuais (uma vez por usuário)
     state.migrations = state.migrations || [];
     if (!state.migrations.includes("zeroCaixa-1")) {
@@ -279,39 +289,84 @@ function loadState() {
 }
 function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
-/* Reabre parcelas/contas-fixas pagas no mês passado quando entra um mês novo.
-   Roda no boot. Só dispara uma vez por mês (controlado por state.lastMonthlyReopen). */
-function autoReopenMonthly() {
-  const currentMonth = todayISO().slice(0, 7); // "YYYY-MM"
-  if (!state.lastMonthlyReopen) {
-    state.lastMonthlyReopen = currentMonth;
-    saveState();
-    return 0;
-  }
-  if (state.lastMonthlyReopen >= currentMonth) return 0;
+/* Helpers de data/vencimento por conta */
 
+function clampDia(year, month, dia) {
+  const last = new Date(year, month + 1, 0).getDate();
+  return Math.min(dia || 1, last);
+}
+
+function dateAtDia(year, month, dia) {
+  return new Date(year, month, clampDia(year, month, dia));
+}
+
+// Última data de abertura (passada ou hoje) — anchor pra detectar reopen
+function ultimaAberturaConta(c, today) {
+  const dia = c.diaAbertura || 1;
+  const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+  if (d >= clampDia(y, m, dia)) return dateAtDia(y, m, dia);
+  return dateAtDia(y, m - 1, dia);
+}
+
+// Próximo (ou atual) vencimento >= hoje
+function proximoVencimentoConta(c, today) {
+  const dia = c.diaVencimento || 10;
+  const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+  const venc = dateAtDia(y, m, dia);
+  if (venc >= dateAtDia(y, m, d)) return venc;
+  return dateAtDia(y, m + 1, dia);
+}
+
+// Status do vencimento: { text, level }
+function statusVencimentoConta(c) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const aberto = valorAbertoConta(c);
+  const dia = c.diaVencimento || 10;
+
+  if (aberto === 0) return { text: "pago este mês", level: "pago" };
+
+  // Vencimento deste mês — se já passou e não pagou, está atrasado
+  const y = today.getFullYear(), m = today.getMonth();
+  const vencMes = dateAtDia(y, m, dia);
+  const diff = Math.round((vencMes - today) / 86400000);
+
+  if (diff < 0) return { text: `venceu há ${Math.abs(diff)} dia${Math.abs(diff) > 1 ? "s" : ""}`, level: "atrasado" };
+  if (diff === 0) return { text: "vence hoje", level: "pendente" };
+  if (diff <= 5)  return { text: `vence em ${diff} dia${diff > 1 ? "s" : ""}`, level: "pendente" };
+  return { text: `vence dia ${dia}`, level: "outras" };
+}
+
+/* Reabre parcelas/contas-fixas pagas baseado no diaAbertura de cada conta.
+   Quando hoje passa do diaAbertura e a última reabertura foi antes dessa data, reabre. */
+function autoReopenContas() {
+  const today = new Date(); today.setHours(0,0,0,0);
   let reaberto = 0;
+
   (state.contas || []).forEach((c) => {
+    const ultimaAb = ultimaAberturaConta(c, today);
+    const ultimaAbISO = toISO(ultimaAb);
+    if (c.lastReopen && c.lastReopen >= ultimaAbISO) return; // já reabriu nesse ciclo
+
+    let mexeu = false;
     (c.itens || []).forEach((it) => {
-      const paidThisMonth = (it.valorPago || 0) >= (it.valorParcela || 0);
+      const paidThisMonth = (it.valorPago || 0) >= (it.valorParcela || 0) && (it.valorParcela || 0) > 0;
       if (!paidThisMonth) return;
 
       if (it.fixa) {
-        // Conta fixa mensal: novo mês, conta abre de novo
-        it.valorPago = 0;
-        reaberto++;
+        it.valorPago = 0; reaberto++; mexeu = true;
       } else if ((it.parcelaAtual || 1) < (it.parcelasTotal || 1)) {
-        // Parcelado: avança pra próxima parcela
         it.parcelaAtual = (it.parcelaAtual || 1) + 1;
         it.valorPago = 0;
-        reaberto++;
+        reaberto++; mexeu = true;
       }
     });
-    c.status = valorAbertoConta(c) === 0 ? "pago" : "pendente";
+    if (mexeu || !c.lastReopen) {
+      c.lastReopen = ultimaAbISO;
+      c.status = valorAbertoConta(c) === 0 ? "pago" : "pendente";
+    }
   });
 
-  state.lastMonthlyReopen = currentMonth;
-  saveState();
+  if (reaberto > 0) saveState();
   return reaberto;
 }
 
@@ -710,7 +765,7 @@ function renderContas(c) {
             ${quitada ? `<span class="badge pago">Quitada</span>` : pago > 0 ? `<span class="badge parcial">Parcial</span>` : `<span class="badge pendente">Pendente</span>`}
           </div>
           <div class="conta-meta">
-            <span class="muted">vence ${fmtBR(conta.vencimento)}</span>
+            ${(() => { const s = statusVencimentoConta(conta); return `<span class="badge ${s.level}">${s.text}</span>`; })()}
             <span class="pill">total ${brl(total)}</span>
             <span class="pill ${aberto > 0 ? "faltam" : "quitada"}">${aberto > 0 ? `falta ${brl(aberto)}` : "quitada"}</span>
           </div>
@@ -752,7 +807,6 @@ function renderContas(c) {
                       ` : `
                         <button class="btn sm success" data-act="pagar-parcela" title="Marca a parcela ${parcelaAtual} como paga">Pagar parcela</button>
                         <button class="btn sm ghost" data-act="parc-item">Parcial</button>
-                        ${parcelaAtual < parcelasTotal ? `<button class="btn sm success" data-act="pagar-todas" title="Quita todas as parcelas restantes">Pagar todas</button>` : ""}
                       `}
                       <button class="btn sm ghost" data-act="edit-item">Editar</button>
                       <button class="btn sm danger" data-act="rm-item">×</button>
@@ -765,6 +819,11 @@ function renderContas(c) {
 
         <footer class="conta-foot">
           <button class="btn sm ghost" data-act="add-item">+ Adicionar item / parcela</button>
+          ${itens.length > 0 ? (
+            itens.some((it) => (it.valorPago || 0) < (it.valorParcela || 0))
+              ? `<button class="btn sm success" data-act="pagar-tudo-conta" title="Marca todas as parcelas atuais como pagas neste mês">Pagar tudo este mês</button>`
+              : `<button class="btn sm ghost" data-act="reabrir-tudo-conta" title="Desfaz o pagamento deste mês de todos os itens">Reabrir tudo</button>`
+          ) : ""}
           <button class="btn sm ghost" data-act="edit-conta">Editar conta</button>
           <button class="btn sm danger" data-act="rm-conta">Remover</button>
         </footer>
@@ -832,11 +891,21 @@ function renderContas(c) {
           <option value="outras">Outras</option>
           <option value="tia">Tia</option>
         </select>
-        <input name="vencimento" type="date" required />
+        <label style="display:flex; flex-direction:column; gap:4px;">
+          <span class="label">Dia do vencimento</span>
+          <input name="diaVencimento" type="number" min="1" max="31" step="1" placeholder="ex: 10" required />
+        </label>
+        <label style="display:flex; flex-direction:column; gap:4px;">
+          <span class="label">Dia de abertura (opcional)</span>
+          <input name="diaAbertura" type="number" min="1" max="31" step="1" placeholder="padrão: 1" />
+        </label>
         <input name="cor" type="color" value="#2f7d32" />
         <button class="btn" type="submit">Salvar</button>
       </form>
-      <p class="hint">Depois de criar a conta, adicione os itens dentro dela (cada item tem parcelas).</p>
+      <p class="hint">
+        <strong>Vencimento</strong>: dia que você precisa pagar (ex: cartão tia vence dia 10).
+        <strong>Abertura</strong>: dia que a próxima parcela é liberada/cobrada (ex: cartão fecha dia 16, então no dia 17 a próxima já vale). Se deixar vazio, abre dia 1 do mês.
+      </p>
     </section>
 
     <section class="panel" id="form-item-panel" style="display:none;">
@@ -909,7 +978,8 @@ function bindContas() {
     titleConta.textContent = conta ? "Editar conta" : "Nova conta";
     formConta.descricao.value = conta?.descricao || "";
     formConta.grupo.value = conta?.grupo || "outras";
-    formConta.vencimento.value = conta?.vencimento || state.referencia;
+    formConta.diaVencimento.value = conta?.diaVencimento || 10;
+    formConta.diaAbertura.value = conta?.diaAbertura || "";
     formConta.cor.value = conta?.cor || "#2f7d32";
     panelConta.style.display = "block";
     panelConta.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -921,10 +991,13 @@ function bindContas() {
   formConta.addEventListener("submit", (e) => {
     e.preventDefault();
     const fd = new FormData(formConta);
+    const dvRaw = Number(fd.get("diaVencimento") || 10);
+    const daRaw = Number(fd.get("diaAbertura") || 1);
     const data = {
       descricao: String(fd.get("descricao") || "").trim(),
       grupo: fd.get("grupo") === "tia" ? "tia" : "outras",
-      vencimento: fd.get("vencimento"),
+      diaVencimento: Math.min(31, Math.max(1, dvRaw)),
+      diaAbertura: Math.min(31, Math.max(1, daRaw)),
       cor: fd.get("cor") || "#2f7d32"
     };
     if (!data.descricao) { toast("Preencha descrição."); return; }
@@ -1014,6 +1087,25 @@ function bindContas() {
       saveState(); toast("Conta removida"); renderAll();
     });
 
+    card.querySelector("[data-act=pagar-tudo-conta]")?.addEventListener("click", () => {
+      // Marca a parcela atual de cada item como paga este mês
+      let n = 0;
+      (conta.itens || []).forEach((it) => {
+        if ((it.valorPago || 0) < (it.valorParcela || 0)) {
+          it.valorPago = it.valorParcela;
+          n++;
+        }
+      });
+      conta.status = valorAbertoConta(conta) === 0 ? "pago" : "pendente";
+      saveState(); toast(`${n} item(ns) pagos este mês em "${conta.descricao}"`); renderAll();
+    });
+
+    card.querySelector("[data-act=reabrir-tudo-conta]")?.addEventListener("click", () => {
+      (conta.itens || []).forEach((it) => { it.valorPago = 0; });
+      conta.status = "pendente";
+      saveState(); toast(`Pagamento deste mês desfeito em "${conta.descricao}"`); renderAll();
+    });
+
     card.querySelectorAll("tr[data-item]").forEach((tr) => {
       const itemId = tr.getAttribute("data-item");
       const item = (conta.itens || []).find((i) => i.id === itemId);
@@ -1035,12 +1127,6 @@ function bindContas() {
             } else {
               toast(`Parcela ${atual}/${total} paga este mês · próxima abre no dia 1`);
             }
-
-          } else if (act === "pagar-todas") {
-            // Quita todas: pula pra última parcela e marca paga
-            item.parcelaAtual = item.parcelasTotal || 1;
-            item.valorPago = item.valorParcela;
-            toast(item.fixa ? "Item pago" : "Todas as parcelas marcadas como pagas");
 
           } else if (act === "reabrir-item") {
             // Desfaz o pagamento deste mês na parcela atual
@@ -1169,7 +1255,10 @@ function renderCaixa(c) {
                 <td data-label="Descrição">${escapeHtml(m.descricao)}</td>
                 <td data-label="Fonte"><span class="pill" style="background:${fonteCor(m.fonteId)};color:#fff;">${escapeHtml(fonteNome(m.fonteId))}</span></td>
                 <td class="num ok" data-label="Valor">+${brl(m.valor)}</td>
-                <td class="actions"><button class="btn sm danger" data-action="rm-mov">×</button></td>
+                <td class="actions">
+                  <button class="btn sm ghost" data-action="edit-mov">Editar</button>
+                  <button class="btn sm danger" data-action="rm-mov">×</button>
+                </td>
               </tr>`).join("")}
           </tbody>
         </table>
@@ -1234,10 +1323,14 @@ function renderCaixa(c) {
   });
 
   document.querySelectorAll("#caixa tr[data-mov]").forEach((tr) => {
+    const id = tr.getAttribute("data-mov");
     tr.querySelector("[data-action=rm-mov]").addEventListener("click", () => {
-      const id = tr.getAttribute("data-mov");
       state.movimentacoes = state.movimentacoes.filter((m) => m.id !== id);
       saveState(); toast("Entrada removida"); renderAll();
+    });
+    tr.querySelector("[data-action=edit-mov]")?.addEventListener("click", () => {
+      const mov = state.movimentacoes.find((m) => m.id === id);
+      if (mov) openQuickSheet(mov.tipo, mov);
     });
   });
 
@@ -1520,7 +1613,7 @@ function renderGastos(c) {
       ${todosGastos.length === 0 ? `<p class="muted">Sem gastos registrados.</p>` : `
       <div class="table-wrap stacked-rows">
         <table>
-          <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
+          <thead><tr><th>Data</th><th>Categoria</th><th>Fonte</th><th>Descrição</th><th>Valor</th><th></th></tr></thead>
           <tbody>
             ${todosGastos.slice(0, 120).map((m) => {
               const excluida = isCatExcluida(m.categoria);
@@ -1531,9 +1624,13 @@ function renderGastos(c) {
                   <span class="pill" style="background:${corDaCategoria(m.categoria)};color:#fff;">${escapeHtml(m.categoria || "—")}</span>
                   ${excluida ? `<span class="pill" title="Não conta no limite">fora do limite</span>` : ""}
                 </td>
+                <td data-label="Fonte"><span class="pill" style="background:${fonteCor(m.fonteId)};color:#fff;">${escapeHtml(fonteNome(m.fonteId))}</span></td>
                 <td data-label="Descrição">${escapeHtml(m.descricao)}</td>
                 <td class="num neg" data-label="Valor">−${brl(m.valor)}</td>
-                <td class="actions"><button class="btn sm danger" data-action="rm-mov">×</button></td>
+                <td class="actions">
+                  <button class="btn sm ghost" data-action="edit-mov">Editar</button>
+                  <button class="btn sm danger" data-action="rm-mov">×</button>
+                </td>
               </tr>`;
             }).join("")}
           </tbody>
@@ -1558,10 +1655,14 @@ function renderGastos(c) {
   });
 
   document.querySelectorAll("#gastos tr[data-mov]").forEach((tr) => {
+    const id = tr.getAttribute("data-mov");
     tr.querySelector("[data-action=rm-mov]").addEventListener("click", () => {
-      const id = tr.getAttribute("data-mov");
       state.movimentacoes = state.movimentacoes.filter((m) => m.id !== id);
       saveState(); toast("Gasto removido"); renderAll();
+    });
+    tr.querySelector("[data-action=edit-mov]")?.addEventListener("click", () => {
+      const mov = state.movimentacoes.find((m) => m.id === id);
+      if (mov) openQuickSheet(mov.tipo, mov);
     });
   });
 
@@ -1900,7 +2001,36 @@ function renderMeta(c) {
     const uber = Number(fd.get("uber") || 0);
     const app99 = Number(fd.get("app99") || 0);
     if (uber <= 0 && app99 <= 0) { toast("Informe pelo menos um valor."); return; }
-    state.uberDias.push({ id: uid(), data, uber, app99, ts: Date.now() });
+
+    // Cria também movimentações de entrada nas fontes Saldo Uber / Saldo 99
+    // pra somar automaticamente no caixa
+    const fonteUber = state.caixa.find((f) => /uber/i.test(f.local || ""));
+    const fonte99   = state.caixa.find((f) => /(^|\s)99(\s|$)/.test(f.local || "") || /99/.test(f.local || ""));
+    const movIds = [];
+
+    if (uber > 0 && fonteUber) {
+      const movId = uid();
+      state.movimentacoes.unshift({
+        id: movId, tipo: "Entrada", categoria: "",
+        data, descricao: `Uber ${fmtBR(data)}`,
+        valor: uber, fonteId: fonteUber.id,
+        origem: "uberDias"
+      });
+      movIds.push(movId);
+    }
+    if (app99 > 0 && fonte99) {
+      const movId = uid();
+      state.movimentacoes.unshift({
+        id: movId, tipo: "Entrada", categoria: "",
+        data, descricao: `99 ${fmtBR(data)}`,
+        valor: app99, fonteId: fonte99.id,
+        origem: "uberDias"
+      });
+      movIds.push(movId);
+    }
+
+    state.uberDias.push({ id: uid(), data, uber, app99, ts: Date.now(), movIds });
+
     const partes = [];
     if (uber > 0)  partes.push(`Uber ${brl(uber)}`);
     if (app99 > 0) partes.push(`99 ${brl(app99)}`);
@@ -1911,6 +2041,12 @@ function renderMeta(c) {
     btn.addEventListener("click", () => {
       const id = btn.closest("[data-id]")?.getAttribute("data-id");
       if (!id) return;
+      const lancamento = state.uberDias.find((x) => x.id === id);
+      if (lancamento?.movIds?.length) {
+        // Remove também as movimentações vinculadas no caixa
+        const movSet = new Set(lancamento.movIds);
+        state.movimentacoes = state.movimentacoes.filter((m) => !movSet.has(m.id));
+      }
       state.uberDias = state.uberDias.filter((x) => x.id !== id);
       saveState(); toast("Lançamento removido"); renderAll();
     });
@@ -2402,22 +2538,31 @@ function setupTabs() {
 
 /* ---------- QUICK FAB (lançar entrada/gasto) ---------- */
 
-function openQuickSheet(tipoInicial) {
+function openQuickSheet(tipoInicial, editingMov) {
   const sheet = document.getElementById("quick-sheet");
   const fab = document.getElementById("quick-fab-btn");
   if (!sheet) return;
 
+  const isEdit = !!editingMov;
   const form = document.getElementById("quick-sheet-form");
   if (form) {
-    form.fonteId.innerHTML = fonteOptions();
-    form.categoria.innerHTML = categoriaOptions();
-    form.data.value = state.referencia || todayISO();
-    form.descricao.value = "";
-    form.valor.value = "";
+    form.fonteId.innerHTML = fonteOptions(editingMov?.fonteId);
+    form.categoria.innerHTML = categoriaOptions(editingMov?.categoria);
+    form.data.value = editingMov?.data || state.referencia || todayISO();
+    form.descricao.value = editingMov?.descricao || "";
+    if (isEdit && editingMov.valor > 0) {
+      form.valor.value = fmtMoneyBR(editingMov.valor);
+    } else {
+      form.valor.value = "";
+    }
   }
 
+  sheet.dataset.editingId = editingMov?.id || "";
+  const titleEl = sheet.querySelector(".quick-sheet-title");
+  if (titleEl) titleEl.textContent = isEdit ? "Editar movimentação" : "Nova movimentação";
+
   const seg = sheet.querySelector(".seg-control");
-  const tipo = tipoInicial === "Entrada" ? "Entrada" : "Gasto";
+  const tipo = isEdit ? editingMov.tipo : (tipoInicial === "Entrada" ? "Entrada" : "Gasto");
   setQuickSheetTipo(seg, tipo);
 
   sheet.classList.add("open");
@@ -2466,6 +2611,24 @@ function setupQuickFab() {
     e.preventDefault();
     const tipo = seg?.getAttribute("data-tipo") === "Entrada" ? "Entrada" : "Gasto";
     const fd = new FormData(form);
+    const editingId = sheet.dataset.editingId;
+
+    if (editingId) {
+      // Atualiza movimentação existente
+      const mov = state.movimentacoes.find((m) => m.id === editingId);
+      if (mov) {
+        mov.tipo = tipo;
+        mov.categoria = tipo === "Gasto" ? String(fd.get("categoria") || "") : "";
+        mov.data = fd.get("data") || todayISO();
+        mov.descricao = String(fd.get("descricao") || "").trim();
+        mov.valor = Number(fd.get("valor") || 0);
+        mov.fonteId = fd.get("fonteId") || "";
+        saveState(); toast("Movimentação atualizada"); renderAll();
+      }
+      closeQuickSheet();
+      return;
+    }
+
     addMovimentacao({
       tipo,
       categoria: tipo === "Gasto" ? String(fd.get("categoria") || "") : "",
@@ -2692,7 +2855,7 @@ function setupThemeToggle() {
 }
 
 loadState();
-const reabertas = autoReopenMonthly();
+const reabertas = autoReopenContas();
 renderAll();
 setupTabs();
 setupThemeToggle();
