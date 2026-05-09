@@ -2651,8 +2651,15 @@ function renderConfig() {
         </p>
       ` : `
         <div style="display:flex; flex-direction:column; gap:10px; max-width:560px; margin-top:12px;">
-          <input id="sync-token" type="password" placeholder="Cole aqui seu Token (ghp_...)" autocomplete="off" />
-          <button class="btn primary" id="btn-sync-connect" type="button" style="align-self:flex-start;">Conectar à nuvem</button>
+          <div style="display:flex; gap:6px;">
+            <input id="sync-token" type="password" placeholder="Cole aqui seu Token (ghp_...)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;" />
+            <button class="btn ghost" type="button" id="btn-sync-toggle-vis" title="Mostrar/ocultar token" style="min-width:auto;">👁</button>
+          </div>
+          <div id="sync-token-info" class="muted" style="font-size:0.8rem; font-family: var(--font-mono);">Cole o token e veja se tem ~40 chars começando com "ghp_"</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn ghost" id="btn-sync-test" type="button">🧪 Testar token</button>
+            <button class="btn primary" id="btn-sync-connect" type="button">Conectar à nuvem</button>
+          </div>
         </div>
         <details style="margin-top:14px;">
           <summary style="cursor:pointer; color: var(--accent); font-weight:500;">📋 Passo a passo (1 minuto, é só uma vez)</summary>
@@ -2786,8 +2793,48 @@ function renderConfig() {
 
   // Sync na nuvem (Gist)
   updateSyncStatus();
+
+  // Toggle visibilidade do token (pra ver se foi colado certo)
+  const tokenInput = document.getElementById("sync-token");
+  const tokenInfo = document.getElementById("sync-token-info");
+  const updateTokenInfo = () => {
+    if (!tokenInput || !tokenInfo) return;
+    const v = tokenInput.value.trim();
+    if (!v) { tokenInfo.textContent = "Cole o token e veja se tem ~40 chars começando com \"ghp_\""; tokenInfo.className = "muted"; return; }
+    const len = v.length;
+    const prefix = v.slice(0, 4);
+    const suffix = v.slice(-4);
+    const ok = (prefix === "ghp_" || prefix === "gith") && len >= 40;
+    tokenInfo.innerHTML = `${ok ? "✓" : "⚠"} <code>${prefix}…${suffix}</code> · <strong>${len}</strong> chars · esperado: ghp_… com ~40 chars`;
+    tokenInfo.className = ok ? "ok" : "warn";
+    tokenInfo.style.fontSize = "0.8rem";
+    tokenInfo.style.fontFamily = "var(--font-mono)";
+  };
+  tokenInput?.addEventListener("input", updateTokenInfo);
+  tokenInput?.addEventListener("paste", () => setTimeout(updateTokenInfo, 50));
+
+  document.getElementById("btn-sync-toggle-vis")?.addEventListener("click", () => {
+    if (!tokenInput) return;
+    tokenInput.type = tokenInput.type === "password" ? "text" : "password";
+  });
+
+  document.getElementById("btn-sync-test")?.addEventListener("click", async () => {
+    const tok = tokenInput?.value.trim();
+    if (!tok) { toast("Cole o token primeiro"); return; }
+    updateSyncStatus("Testando…", "muted");
+    try {
+      const user = await ghFetch(tok, "/user");
+      updateSyncStatus(`✓ Token válido · usuário: ${user.login}`, "ok");
+      toast(`Token OK — usuário ${user.login}`);
+    } catch (err) {
+      console.error(err);
+      updateSyncStatus(`⚠ ${err.message}`, "warn");
+      toast("Token inválido — confira ou gere outro");
+    }
+  });
+
   document.getElementById("btn-sync-connect")?.addEventListener("click", async () => {
-    const tok = document.getElementById("sync-token").value.trim();
+    const tok = tokenInput?.value.trim();
     if (!tok) { toast("Cole o token primeiro"); return; }
     updateSyncStatus("Conectando…", "muted");
     try {
