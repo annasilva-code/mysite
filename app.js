@@ -390,6 +390,14 @@ function caixaSaldoCalculado(fonte) {
   return (fonte.valor || 0) + ajuste;
 }
 
+// Debug: detalha entradas/gastos de uma fonte
+function caixaBreakdown(fonte) {
+  const movs = state.movimentacoes.filter((m) => m.fonteId === fonte.id);
+  const entradas = sum(movs.filter((m) => m.tipo === "Entrada").map((m) => m.valor || 0));
+  const gastos   = sum(movs.filter((m) => m.tipo === "Gasto").map((m) => m.valor || 0));
+  return { base: fonte.valor || 0, entradas, gastos, qtdMovs: movs.length };
+}
+
 function valorAbertoConta(c) {
   if (c.status === "pago") return 0;
   return sum((c.itens || []).map((i) => Math.max(0, (i.valorParcela || 0) - (i.valorPago || 0))));
@@ -1191,12 +1199,15 @@ function renderCaixa(c) {
           <div class="value pos">${brl(c.caixaTotal)}</div>
           <div class="sub">Soma de todas as fontes</div>
         </div>
-        ${linhas.slice(0, 3).map((l) => `
+        ${linhas.slice(0, 3).map((l) => {
+          const bd = caixaBreakdown(l);
+          return `
           <div class="kpi" style="--conta-cor:${l.cor || "#2f7d32"}; border-left: 4px solid ${l.cor || "#2f7d32"};">
             <h3>${escapeHtml(l.local)}</h3>
-            <div class="value">${brl(l.saldoCalc)}</div>
-            <div class="sub">base ${brl(l.base)}</div>
-          </div>`).join("")}
+            <div class="value ${l.saldoCalc < 0 ? "neg" : ""}">${brl(l.saldoCalc)}</div>
+            <div class="sub">base ${brl(bd.base)} · <span class="ok">+${brl(bd.entradas)}</span> · <span class="neg">−${brl(bd.gastos)}</span></div>
+          </div>`;
+        }).join("")}
       </div>
 
       <div class="chart-grid">
