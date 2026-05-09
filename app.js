@@ -523,7 +523,7 @@ function renderDashboard(c) {
           <option value="Entrada">Entrada</option>
         </select>
         <select name="fonteId" id="quick-fonte" required>${fonteOptions()}</select>
-        <select name="categoria" id="quick-cat" required>${categoriaOptions()}</select>
+        <select name="categoria" id="quick-cat" data-cat-field required>${categoriaOptions()}</select>
         <input name="data" type="date" required value="${state.referencia}" />
         <input name="descricao" required placeholder="Descrição (ex: tinta entrou)" maxlength="60" />
         <input name="valor" type="number" min="0.01" step="0.01" required placeholder="Valor" />
@@ -613,12 +613,27 @@ function renderDashboard(c) {
     state.config.limiteMensal = Number(e.target.value) || 500;
     saveState(); renderAll();
   });
-  document.getElementById("quick-mov").addEventListener("submit", (e) => {
+  // Toggle do campo Categoria conforme tipo (entrada não tem categoria)
+  const quickForm = document.getElementById("quick-mov");
+  const quickTipo = document.getElementById("quick-tipo");
+  const quickCat = document.getElementById("quick-cat");
+  const quickSubmit = quickForm.querySelector("button[type=submit]");
+  const updateQuickTipo = () => {
+    const isEntrada = quickTipo.value === "Entrada";
+    quickForm.classList.toggle("is-entrada", isEntrada);
+    quickCat.required = !isEntrada;
+    if (quickSubmit) quickSubmit.textContent = isEntrada ? "Adicionar entrada" : "Adicionar gasto";
+  };
+  quickTipo.addEventListener("change", updateQuickTipo);
+  updateQuickTipo();
+
+  quickForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const tipo = fd.get("tipo");
     addMovimentacao({
-      tipo: fd.get("tipo"),
-      categoria: fd.get("categoria"),
+      tipo,
+      categoria: tipo === "Gasto" ? fd.get("categoria") : "",
       data: fd.get("data"),
       descricao: String(fd.get("descricao") || "").trim(),
       valor: Number(fd.get("valor") || 0),
@@ -626,6 +641,7 @@ function renderDashboard(c) {
     });
     e.currentTarget.reset();
     document.querySelector("#quick-mov [name=data]").value = state.referencia;
+    updateQuickTipo();
   });
 
   renderCharts(c);

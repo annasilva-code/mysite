@@ -383,9 +383,12 @@ select option { background: var(--surface); color: var(--text); }
    =========================================== */
 .form-grid { display: grid; gap: 10px; }
 .form-grid.cols-mov          { grid-template-columns: 130px 160px 150px 1fr 130px 130px; }
-.form-grid.cols-mov-fonte    { grid-template-columns: 110px 150px 150px 140px 1fr 120px 120px; }
+.form-grid.cols-mov-fonte             { grid-template-columns: 110px 150px 150px 140px 1fr 120px 120px; }
+.form-grid.cols-mov-fonte.is-entrada  { grid-template-columns: 110px 150px 140px 1fr 120px 120px; }
+.form-grid.cols-mov-fonte.is-entrada [data-cat-field] { display: none; }
 @media (max-width: 980px) {
-  .form-grid.cols-mov-fonte  { grid-template-columns: 1fr 1fr; }
+  .form-grid.cols-mov-fonte,
+  .form-grid.cols-mov-fonte.is-entrada { grid-template-columns: 1fr 1fr; }
   .form-grid.cols-mov-fonte > [name="descricao"],
   .form-grid.cols-mov-fonte > button[type="submit"] { grid-column: 1 / -1; }
 }
