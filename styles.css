@@ -878,6 +878,76 @@ tbody tr:hover:not(.section) {
 }
 
 /* ===========================================
+   COMBUSTÍVEL — pills de categoria + lista incluir
+   =========================================== */
+.cat-pill {
+  display: inline-flex; align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font: inherit; font-size: 0.82rem; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none; appearance: none;
+}
+.cat-pill::before {
+  content: "";
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--c, #888);
+  margin-right: 6px;
+}
+.cat-pill:hover { border-color: var(--border-strong); color: var(--text); }
+.cat-pill.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.incluir-gasto-list { display: flex; flex-direction: column; gap: 4px; }
+.incluir-gasto-item {
+  display: grid;
+  grid-template-columns: 24px 80px 130px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.incluir-gasto-item:hover { background: var(--surface-2); }
+.incluir-gasto-item input[type="checkbox"] {
+  width: 18px; height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+.incluir-gasto-item .ig-data { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+.incluir-gasto-item .ig-cat  { font-size: 0.78rem; font-weight: 500; }
+.incluir-gasto-item .ig-desc { font-size: 0.88rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.incluir-gasto-item .ig-valor { font-size: 0.86rem; }
+@media (max-width: 600px) {
+  .incluir-gasto-item {
+    grid-template-columns: 24px 1fr auto;
+    grid-template-areas:
+      "check desc valor"
+      ".     meta meta";
+    row-gap: 4px;
+  }
+  .incluir-gasto-item input[type="checkbox"] { grid-area: check; }
+  .incluir-gasto-item .ig-desc { grid-area: desc; }
+  .incluir-gasto-item .ig-valor { grid-area: valor; }
+  .incluir-gasto-item .ig-data,
+  .incluir-gasto-item .ig-cat { grid-area: meta; display: inline; margin-right: 8px; }
+}
+
+/* ===========================================
    UBER/99 — lista de lançamentos
    =========================================== */
 .uber-list {

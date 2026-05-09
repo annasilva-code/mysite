@@ -1917,11 +1917,14 @@ function corDaCategoria(nome) {
 
 function renderCombustivel() {
   const el = document.getElementById("combustivel");
-  // Considera tanto registros em state.gasolina quanto movimentos com categoria marcada como combustível
+  // Considera 3 fontes:
+  //   1) categoria com flag eCombustivel
+  //   2) gasto individual com flag marcadoComb
+  //   3) registros antigos em state.gasolina
   const isCatComb = (nome) => state.categorias.some((c) => c.nome === nome && c.eCombustivel);
   const movsComb = state.movimentacoes
-    .filter((m) => m.tipo === "Gasto" && isCatComb(m.categoria))
-    .map((m) => ({ id: m.id, data: m.data, descricao: m.descricao, valor: m.valor, fonte: "mov" }));
+    .filter((m) => m.tipo === "Gasto" && (isCatComb(m.categoria) || m.marcadoComb))
+    .map((m) => ({ id: m.id, data: m.data, descricao: m.descricao, valor: m.valor, fonte: "mov", categoria: m.categoria, marcadoAvulso: !!m.marcadoComb && !isCatComb(m.categoria) }));
   const reg = (state.gasolina || []).map((g) => ({ id: g.id, data: g.data, descricao: g.descricao, valor: g.valor, fonte: "gas" }));
   const todos = [...movsComb, ...reg].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
 
@@ -2000,9 +2003,22 @@ function renderCombustivel() {
         </div>
       </div>
 
-      <p class="hint" style="margin-top:8px;">
-        Pra registrar um abastecimento, lance um <strong>gasto normal</strong> (Resumo → Lançar movimentação ou FAB) com categoria marcada como <strong>Combustível</strong> em <a href="#" data-tab="config" style="color:var(--accent);">Categorias</a>. Ele aparece aqui automático.
-      </p>
+      <div class="comb-config" style="margin-top:14px; padding-top:14px; border-top: 1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom: 8px;">
+          <div>
+            <strong style="font-size:0.92rem;">Categorias consideradas combustível</strong>
+            <p class="hint" style="margin-top:2px;">Clica nas categorias que devem aparecer aqui. Gastos lançados nelas viram combustível automaticamente.</p>
+          </div>
+          <button class="btn ghost sm" id="btn-incluir-gasto-comb" type="button">+ Incluir gasto avulso</button>
+        </div>
+        <div class="comb-cats" style="display:flex; flex-wrap:wrap; gap:6px;">
+          ${state.categorias.map((c) => `
+            <button class="cat-pill ${c.eCombustivel ? "on" : ""}" data-cat-id="${c.id}" type="button"
+              style="--c:${c.cor || "#888"};">
+              ${c.eCombustivel ? "✓ " : ""}${escapeHtml(c.nome)}
+            </button>`).join("")}
+        </div>
+      </div>
     </section>
 
     <section class="panel">
@@ -2045,6 +2061,22 @@ function renderCombustivel() {
       saveState(); toast("Removido"); renderAll();
     });
   });
+
+  // Toggle pill de categoria
+  document.querySelectorAll("#combustivel .cat-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-cat-id");
+      const cat = state.categorias.find((c) => c.id === id);
+      if (!cat) return;
+      cat.eCombustivel = !cat.eCombustivel;
+      saveState();
+      toast(cat.eCombustivel ? `${cat.nome} marcada como combustível` : `${cat.nome} removida de combustível`);
+      renderAll();
+    });
+  });
+
+  // Incluir gasto avulso (que não é de categoria combustível)
+  document.getElementById("btn-incluir-gasto-comb")?.addEventListener("click", openIncluirGastoSheet);
 
   // Gráfico tendência semanal
   if (typeof Chart !== "undefined") {
@@ -2959,7 +2991,7 @@ function setupTabs() {
   document.getElementById("mobile-more-backdrop")?.addEventListener("click", closeMobileMore);
   // Esc fecha drawer e quick sheet
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closeMobileMore(); closeQuickSheet(); closeTransferSheet(); }
+    if (e.key === "Escape") { closeMobileMore(); closeQuickSheet(); closeTransferSheet(); closeIncluirGastoSheet(); }
   });
 }
 
@@ -3065,6 +3097,64 @@ function setupQuickFab() {
       fonteId: fd.get("fonteId") || ""
     });
     closeQuickSheet();
+  });
+}
+
+/* ---------- INCLUIR GASTO AVULSO EM COMBUSTÍVEL ---------- */
+
+function openIncluirGastoSheet() {
+  const sheet = document.getElementById("incluir-gasto-sheet");
+  const list = document.getElementById("incluir-gasto-list");
+  if (!sheet || !list) return;
+
+  const isCatComb = (nome) => state.categorias.some((c) => c.nome === nome && c.eCombustivel);
+  // Mostra os últimos 60 gastos que NÃO são de categoria combustível
+  const candidatos = state.movimentacoes
+    .filter((m) => m.tipo === "Gasto" && !isCatComb(m.categoria))
+    .slice(0, 60);
+
+  if (candidatos.length === 0) {
+    list.innerHTML = `<p class="muted">Nenhum gasto registrado fora das categorias de combustível.</p>`;
+  } else {
+    list.innerHTML = candidatos.map((m) => `
+      <label class="incluir-gasto-item" data-mov-id="${m.id}">
+        <input type="checkbox" ${m.marcadoComb ? "checked" : ""} />
+        <span class="ig-data">${fmtBR(m.data)}</span>
+        <span class="ig-cat" style="color:${corDaCategoria(m.categoria)};">${escapeHtml(m.categoria || "—")}</span>
+        <span class="ig-desc">${escapeHtml(m.descricao || "")}</span>
+        <span class="ig-valor num neg">−${brl(m.valor)}</span>
+      </label>
+    `).join("");
+  }
+
+  sheet.classList.add("open");
+}
+
+function closeIncluirGastoSheet() {
+  document.getElementById("incluir-gasto-sheet")?.classList.remove("open");
+}
+
+function setupIncluirGasto() {
+  document.getElementById("incluir-gasto-backdrop")?.addEventListener("click", closeIncluirGastoSheet);
+  document.getElementById("incluir-gasto-cancel")?.addEventListener("click", closeIncluirGastoSheet);
+  document.getElementById("incluir-gasto-save")?.addEventListener("click", () => {
+    const list = document.getElementById("incluir-gasto-list");
+    let n = 0;
+    list.querySelectorAll(".incluir-gasto-item").forEach((label) => {
+      const id = label.getAttribute("data-mov-id");
+      const cb = label.querySelector("input[type=checkbox]");
+      const mov = state.movimentacoes.find((m) => m.id === id);
+      if (!mov) return;
+      const novo = !!cb.checked;
+      if ((!!mov.marcadoComb) !== novo) {
+        mov.marcadoComb = novo;
+        n++;
+      }
+    });
+    saveState();
+    closeIncluirGastoSheet();
+    if (n > 0) toast(`${n} gasto(s) atualizado(s)`);
+    renderAll();
   });
 }
 
@@ -3409,6 +3499,7 @@ setupTabs();
 setupThemeToggle();
 setupQuickFab();
 setupTransfer();
+setupIncluirGasto();
 setupCurrencyInputs();
 if (reabertas > 0) {
   setTimeout(() => toast(`${reabertas} parcela(s) abertas pra este mês`), 400);

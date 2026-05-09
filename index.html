@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
   <main class="container">
@@ -151,6 +151,21 @@
     </svg>
   </button>
 
+  <!-- Sheet: incluir gasto avulso em Combustível -->
+  <div class="quick-sheet" id="incluir-gasto-sheet" aria-hidden="true" role="dialog" aria-label="Incluir gasto em combustível">
+    <div class="quick-sheet-backdrop" id="incluir-gasto-backdrop"></div>
+    <div class="quick-sheet-panel">
+      <div class="quick-sheet-handle" aria-hidden="true"></div>
+      <h3 class="quick-sheet-title">Incluir gasto em Combustível</h3>
+      <p class="hint" style="margin-top:0;">Gastos abaixo NÃO são de categoria combustível. Marque os que quiser incluir manualmente.</p>
+      <div id="incluir-gasto-list" class="incluir-gasto-list" style="margin-top:12px; max-height:50vh; overflow-y:auto;"></div>
+      <div style="display:flex; gap:8px; margin-top:14px; justify-content:flex-end;">
+        <button class="btn ghost" type="button" id="incluir-gasto-cancel">Fechar</button>
+        <button class="btn primary" type="button" id="incluir-gasto-save">Salvar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Sheet: transferir entre fontes -->
   <div class="quick-sheet" id="transfer-sheet" aria-hidden="true" role="dialog" aria-label="Transferir entre fontes">
     <div class="quick-sheet-backdrop" id="transfer-sheet-backdrop"></div>
@@ -270,6 +285,6 @@
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="app.js?v=24"></script>
+  <script src="app.js?v=25"></script>
 </body>
 </html>
