@@ -925,6 +925,23 @@ tbody tr:hover:not(.section) {
 .warn  { color: var(--warn);    font-weight: 500; }
 
 /* ===========================================
+   SYNC STATUS (Categorias)
+   =========================================== */
+.sync-status {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.sync-status.ok    { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 25%, transparent); }
+.sync-status.warn  { background: var(--warn-soft);    color: var(--warn);    border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.sync-status.muted { color: var(--muted); }
+
+/* ===========================================
    ACCENT PICKER (Categorias / Personalização)
    =========================================== */
 .accent-row {

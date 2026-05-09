@@ -287,7 +287,155 @@ function loadState() {
     localStorage.removeItem(STORAGE_KEY);
   }
 }
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleSync();
+}
+
+/* ---------- SYNC (GitHub Gist privado) ---------- */
+
+const SYNC_FILE = "caua-painel-data.json";
+const SYNC_DESC = "Lord Cauã — backup do painel financeiro (NÃO mexer manualmente)";
+let _syncTimer = null;
+let _syncing = false;
+
+function syncCfg() {
+  return state.config?.sync || {};
+}
+
+function setSyncCfg(patch) {
+  state.config.sync = { ...(state.config.sync || {}), ...patch };
+}
+
+function syncStatusEl() { return document.getElementById("sync-status"); }
+
+function updateSyncStatus(msg, level) {
+  const el = syncStatusEl();
+  if (!el) return;
+  const cfg = syncCfg();
+  if (msg) {
+    el.textContent = msg;
+    el.className = `sync-status ${level || ""}`;
+    return;
+  }
+  if (cfg.token && cfg.gistId) {
+    const last = cfg.lastSyncAt ? new Date(cfg.lastSyncAt).toLocaleString("pt-BR") : "nunca";
+    el.textContent = `✓ Conectado · última sync: ${last}`;
+    el.className = "sync-status ok";
+  } else {
+    el.textContent = "Não conectado";
+    el.className = "sync-status muted";
+  }
+}
+
+async function ghFetch(token, path, opts = {}) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    ...opts,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`GitHub ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
+async function findExistingGist(token) {
+  // Lista até 100 gists do usuário e procura por SYNC_FILE
+  const gists = await ghFetch(token, "/gists?per_page=100");
+  const found = gists.find((g) => g.files && g.files[SYNC_FILE]);
+  return found?.id || null;
+}
+
+async function pushToGist() {
+  const cfg = syncCfg();
+  if (!cfg.token || !cfg.gistId) return;
+  const payload = {
+    _app: "lord-caua-painel",
+    _version: 1,
+    _exportedAt: new Date().toISOString(),
+    state
+  };
+  const body = {
+    description: SYNC_DESC,
+    files: { [SYNC_FILE]: { content: JSON.stringify(payload, null, 2) } }
+  };
+  await ghFetch(cfg.token, `/gists/${cfg.gistId}`, { method: "PATCH", body: JSON.stringify(body) });
+  setSyncCfg({ lastSyncAt: new Date().toISOString() });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  updateSyncStatus();
+}
+
+async function pullFromGist({ silent } = {}) {
+  const cfg = syncCfg();
+  if (!cfg.token || !cfg.gistId) return null;
+  const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
+  const fileMeta = gist.files?.[SYNC_FILE];
+  if (!fileMeta) throw new Error(`Arquivo ${SYNC_FILE} não encontrado no gist`);
+  let content = fileMeta.content;
+  if (fileMeta.truncated && fileMeta.raw_url) {
+    content = await (await fetch(fileMeta.raw_url)).text();
+  }
+  const obj = JSON.parse(content);
+  const incoming = obj?._app === "lord-caua-painel" && obj.state ? obj.state : obj;
+  if (!incoming || typeof incoming !== "object") throw new Error("Conteúdo inválido");
+  return incoming;
+}
+
+function scheduleSync() {
+  const cfg = syncCfg();
+  if (!cfg.token || !cfg.gistId) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    if (_syncing) return;
+    _syncing = true;
+    updateSyncStatus("Sincronizando…", "muted");
+    try {
+      await pushToGist();
+    } catch (err) {
+      console.error("Sync push failed:", err);
+      updateSyncStatus("⚠ Erro ao sincronizar", "warn");
+    } finally {
+      _syncing = false;
+    }
+  }, 1500);
+}
+
+async function connectSync(token) {
+  if (!token || token.length < 20) throw new Error("Token inválido");
+  // Testa token + procura gist existente
+  await ghFetch(token, "/user");
+  let gistId = await findExistingGist(token);
+  if (!gistId) {
+    // Cria novo gist com estado atual
+    const payload = {
+      _app: "lord-caua-painel", _version: 1,
+      _exportedAt: new Date().toISOString(), state
+    };
+    const created = await ghFetch(token, "/gists", {
+      method: "POST",
+      body: JSON.stringify({
+        description: SYNC_DESC,
+        public: false,
+        files: { [SYNC_FILE]: { content: JSON.stringify(payload, null, 2) } }
+      })
+    });
+    gistId = created.id;
+  }
+  setSyncCfg({ token, gistId, lastSyncAt: new Date().toISOString() });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { gistId, foundExisting: true };
+}
+
+async function disconnectSync() {
+  setSyncCfg({ token: null, gistId: null, lastSyncAt: null });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
 
 /* Helpers de data/vencimento por conta */
 
@@ -831,6 +979,7 @@ function renderContas(c) {
                       ` : `
                         <button class="btn sm success" data-act="pagar-parcela" title="Marca a parcela ${parcelaAtual} como paga">Pagar parcela</button>
                         <button class="btn sm ghost" data-act="parc-item">Parcial</button>
+                        ${parcelaAtual > 1 ? `<button class="btn sm ghost" data-act="voltar-parcela" title="Volta pra parcela anterior (paga)">↶ Voltar</button>` : ""}
                       `}
                       <button class="btn sm ghost" data-act="edit-item">Editar</button>
                       <button class="btn sm danger" data-act="rm-item">×</button>
@@ -1156,6 +1305,15 @@ function bindContas() {
             // Desfaz o pagamento deste mês na parcela atual
             item.valorPago = 0;
             toast("Pagamento deste mês desfeito");
+
+          } else if (act === "voltar-parcela") {
+            // Volta pra parcela anterior e marca como paga
+            // (útil se o auto-reopen avançou indevidamente)
+            const atual = item.parcelaAtual || 1;
+            if (atual <= 1) { toast("Já está na primeira parcela"); return; }
+            item.parcelaAtual = atual - 1;
+            item.valorPago = item.valorParcela;
+            toast(`Voltou pra parcela ${item.parcelaAtual}/${item.parcelasTotal} (paga)`);
 
           } else if (act === "parc-item") {
             const aberto = Math.max(0, (item.valorParcela || 0) - (item.valorPago || 0));
@@ -2450,22 +2608,61 @@ function renderConfig() {
     <section class="panel">
       <div class="panel-head">
         <div>
-          <h2 class="panel-title">Sincronizar entre dispositivos</h2>
-          <p class="panel-sub">Os dados ficam só neste navegador. Pra usar no celular, baixe um backup aqui e importe lá.</p>
+          <h2 class="panel-title">Sincronização automática (☁ nuvem)</h2>
+          <p class="panel-sub">Dados sincronizam entre PC e celular via Gist privado do GitHub</p>
+        </div>
+      </div>
+
+      <div id="sync-status" class="sync-status muted">Não conectado</div>
+
+      ${syncCfg().token ? `
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+          <button class="btn ghost" id="btn-sync-now" type="button">↻ Sincronizar agora</button>
+          <button class="btn ghost" id="btn-sync-pull" type="button">↓ Puxar da nuvem</button>
+          <button class="btn danger" id="btn-sync-disconnect" type="button">Desconectar</button>
+        </div>
+        <p class="hint">
+          <strong>Gist em uso:</strong> <a href="https://gist.github.com/${syncCfg().gistId}" target="_blank" rel="noopener">${syncCfg().gistId}</a>.
+          Tudo que você salvar aqui é enviado pra nuvem em ~1.5s. Ao abrir o site em outro device com o mesmo token, ele puxa automaticamente.
+        </p>
+      ` : `
+        <div style="display:flex; flex-direction:column; gap:10px; max-width:560px; margin-top:12px;">
+          <input id="sync-token" type="password" placeholder="Cole aqui seu Token (ghp_...)" autocomplete="off" />
+          <button class="btn primary" id="btn-sync-connect" type="button" style="align-self:flex-start;">Conectar à nuvem</button>
+        </div>
+        <details style="margin-top:14px;">
+          <summary style="cursor:pointer; color: var(--accent); font-weight:500;">📋 Passo a passo (1 minuto, é só uma vez)</summary>
+          <ol style="margin-top:10px; padding-left:20px; line-height:1.7; color:var(--text);">
+            <li>Vai em <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">github.com/settings/tokens</a> (ou Settings → Developer settings → Personal access tokens → Fine-grained)</li>
+            <li>Clica <strong>"Generate new token"</strong></li>
+            <li>Nome qualquer (ex: "painel cauã"), expiração: sem expirar (ou 1 ano)</li>
+            <li>Em <strong>Account permissions</strong>, marca <strong>"Gists" → Read and write</strong></li>
+            <li>Gera, copia o token (começa com <code>github_pat_...</code> ou <code>ghp_...</code>)</li>
+            <li>Cola aí em cima e clica <strong>Conectar</strong></li>
+            <li>No celular, abre o site, vai em Categorias e cola o <strong>mesmo token</strong> — pronto, dados aparecem ☁</li>
+          </ol>
+          <p class="hint" style="margin-top:10px;">
+            ⚠️ <strong>Segurança:</strong> O token fica salvo só no localStorage deste device. Não compartilha com ninguém — ele dá acesso aos seus gists.
+            Se perder o device, vai em github.com/settings/tokens e revoga.
+          </p>
+        </details>
+      `}
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Backup manual (.json)</h2>
+          <p class="panel-sub">Pra exportar uma cópia local — usa se não quiser depender da nuvem</p>
         </div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn ghost" id="btn-backup" type="button">↓ Baixar backup (.json)</button>
+        <button class="btn ghost" id="btn-backup" type="button">↓ Baixar backup</button>
         <label class="btn ghost" for="btn-restore-input" style="cursor:pointer; display:inline-flex; align-items:center;">
           ↑ Restaurar backup
           <input type="file" id="btn-restore-input" accept="application/json,.json" hidden />
         </label>
       </div>
-      <p class="hint">
-        <strong>No PC</strong>: clica em <em>Baixar backup</em> — gera um arquivo <code>caua-backup-YYYY-MM-DD.json</code>.
-        Manda esse arquivo pro celular (WhatsApp, AirDrop, email).
-        <strong>No celular</strong>: abre o site, vai em Categorias, clica <em>Restaurar backup</em> e seleciona o arquivo. Substitui tudo pelo backup.
-      </p>
     </section>
   `;
 
@@ -2561,6 +2758,60 @@ function renderConfig() {
       }
     };
     reader.readAsText(file);
+  });
+
+  // Sync na nuvem (Gist)
+  updateSyncStatus();
+  document.getElementById("btn-sync-connect")?.addEventListener("click", async () => {
+    const tok = document.getElementById("sync-token").value.trim();
+    if (!tok) { toast("Cole o token primeiro"); return; }
+    updateSyncStatus("Conectando…", "muted");
+    try {
+      const res = await connectSync(tok);
+      toast(res.foundExisting ? "Conectado · gist criado/encontrado" : "Conectado");
+      renderAll();
+    } catch (err) {
+      console.error(err);
+      updateSyncStatus(`⚠ ${err.message}`, "warn");
+      toast("Falha ao conectar — confira o token");
+    }
+  });
+
+  document.getElementById("btn-sync-now")?.addEventListener("click", async () => {
+    updateSyncStatus("Sincronizando…", "muted");
+    try {
+      await pushToGist();
+      toast("Sincronizado ☁");
+    } catch (err) {
+      console.error(err);
+      updateSyncStatus(`⚠ ${err.message}`, "warn");
+    }
+  });
+
+  document.getElementById("btn-sync-pull")?.addEventListener("click", async () => {
+    if (!confirm("Substituir os dados deste device pelos dados da nuvem?")) return;
+    updateSyncStatus("Puxando…", "muted");
+    try {
+      const remote = await pullFromGist();
+      if (remote) {
+        state = remote;
+        autoReopenContas();
+        setSyncCfg({ lastSyncAt: new Date().toISOString() });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        renderAll();
+        toast("Dados puxados ☁");
+      }
+    } catch (err) {
+      console.error(err);
+      updateSyncStatus(`⚠ ${err.message}`, "warn");
+    }
+  });
+
+  document.getElementById("btn-sync-disconnect")?.addEventListener("click", async () => {
+    if (!confirm("Desconectar da nuvem? Os dados ficam salvos localmente.")) return;
+    await disconnectSync();
+    toast("Desconectado");
+    renderAll();
   });
 
   // Color picker — cor de destaque
@@ -2959,3 +3210,25 @@ setupCurrencyInputs();
 if (reabertas > 0) {
   setTimeout(() => toast(`${reabertas} parcela(s) abertas pra este mês`), 400);
 }
+
+// Sync automático: se já tem token, busca dados mais recentes da nuvem
+(async () => {
+  const cfg = syncCfg();
+  if (!cfg.token || !cfg.gistId) return;
+  updateSyncStatus("Buscando dados da nuvem…", "muted");
+  try {
+    const remote = await pullFromGist();
+    if (!remote) return;
+    // Sempre adota o estado da nuvem ao abrir (PC ou celular ficam idênticos)
+    state = remote;
+    autoReopenContas();
+    setSyncCfg({ lastSyncAt: new Date().toISOString() });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    renderAll();
+    updateSyncStatus();
+    toast("Dados sincronizados da nuvem ☁");
+  } catch (err) {
+    console.error("Pull inicial falhou:", err);
+    updateSyncStatus("⚠ Erro ao puxar da nuvem", "warn");
+  }
+})();
