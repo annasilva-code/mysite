@@ -2746,11 +2746,17 @@ function renderConfig() {
 
   // Backup: baixa JSON com todo o estado
   document.getElementById("btn-backup").addEventListener("click", () => {
+    // Clona o estado e remove credenciais sensíveis antes de exportar
+    const safeState = JSON.parse(JSON.stringify(state));
+    if (safeState.config?.sync) {
+      delete safeState.config.sync.token;
+      delete safeState.config.sync.gistId;
+    }
     const payload = {
       _app: "lord-caua-painel",
       _version: 1,
       _exportedAt: new Date().toISOString(),
-      state: state
+      state: safeState
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2761,10 +2767,10 @@ function renderConfig() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    toast("Backup baixado");
+    toast("Backup baixado (sem token)");
   });
 
-  // Restore: importa JSON e substitui o state
+  // Restore: importa JSON e substitui o state — PRESERVA a config de sync atual deste device
   document.getElementById("btn-restore-input").addEventListener("change", (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2774,12 +2780,18 @@ function renderConfig() {
         const obj = JSON.parse(reader.result);
         const incoming = obj?.state && obj?._app === "lord-caua-painel" ? obj.state : obj;
         if (!incoming || typeof incoming !== "object") throw new Error("formato inválido");
-        if (!confirm("Isso vai SUBSTITUIR todos os dados deste navegador pelo backup. Confirmar?")) {
+        if (!confirm("Isso vai SUBSTITUIR os dados deste navegador pelo backup (a config de sync atual é preservada). Confirmar?")) {
           e.target.value = "";
           return;
         }
+        // Preserva o sync config atual deste device pra não perder o token
+        const syncAtual = state.config?.sync || null;
+        if (syncAtual) {
+          incoming.config = incoming.config || {};
+          incoming.config.sync = syncAtual;
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(incoming));
-        toast("Backup restaurado");
+        toast("Backup restaurado · token preservado");
         setTimeout(() => location.reload(), 600);
       } catch (err) {
         toast("Arquivo inválido");
