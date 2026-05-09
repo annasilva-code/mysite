@@ -11,10 +11,10 @@ const DEFAULT_STATE = {
   periodo: "mes",
   referencia: todayISO(),
   caixa: [
-    { id: SANT_ID,  local: "Banco Santander", valor: 419.22, cor: "#ff5564" },
-    { id: uid(),    local: "Espécie",         valor: 25.0,   cor: "#4ade80" },
-    { id: uid(),    local: "Saldo Uber",      valor: 23.42,  cor: "#ffffff" },
-    { id: uid(),    local: "Saldo 99",        valor: 72.65,  cor: "#ff9a3c" }
+    { id: SANT_ID,  local: "Banco Santander", valor: 0, cor: "#ff5564" },
+    { id: uid(),    local: "Espécie",         valor: 0, cor: "#4ade80" },
+    { id: uid(),    local: "Saldo Uber",      valor: 0, cor: "#ffffff" },
+    { id: uid(),    local: "Saldo 99",        valor: 0, cor: "#ff9a3c" }
   ],
   contas: [
     {
@@ -267,11 +267,53 @@ function loadState() {
         fixa: typeof it.fixa === "boolean" ? it.fixa : (!it.parcelasTotal || it.parcelasTotal <= 1)
       }))
     }));
+    // Migrações pontuais (uma vez por usuário)
+    state.migrations = state.migrations || [];
+    if (!state.migrations.includes("zeroCaixa-1")) {
+      state.caixa = (state.caixa || []).map((x) => ({ ...x, valor: 0 }));
+      state.migrations.push("zeroCaixa-1");
+    }
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
 }
 function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+/* Reabre parcelas/contas-fixas pagas no mês passado quando entra um mês novo.
+   Roda no boot. Só dispara uma vez por mês (controlado por state.lastMonthlyReopen). */
+function autoReopenMonthly() {
+  const currentMonth = todayISO().slice(0, 7); // "YYYY-MM"
+  if (!state.lastMonthlyReopen) {
+    state.lastMonthlyReopen = currentMonth;
+    saveState();
+    return 0;
+  }
+  if (state.lastMonthlyReopen >= currentMonth) return 0;
+
+  let reaberto = 0;
+  (state.contas || []).forEach((c) => {
+    (c.itens || []).forEach((it) => {
+      const paidThisMonth = (it.valorPago || 0) >= (it.valorParcela || 0);
+      if (!paidThisMonth) return;
+
+      if (it.fixa) {
+        // Conta fixa mensal: novo mês, conta abre de novo
+        it.valorPago = 0;
+        reaberto++;
+      } else if ((it.parcelaAtual || 1) < (it.parcelasTotal || 1)) {
+        // Parcelado: avança pra próxima parcela
+        it.parcelaAtual = (it.parcelaAtual || 1) + 1;
+        it.valorPago = 0;
+        reaberto++;
+      }
+    });
+    c.status = valorAbertoConta(c) === 0 ? "pago" : "pendente";
+  });
+
+  state.lastMonthlyReopen = currentMonth;
+  saveState();
+  return reaberto;
+}
 
 /* ---------- TOAST ---------- */
 
@@ -689,9 +731,10 @@ function renderContas(c) {
                 const pagoAcumulado = parcelasJaPagas * valorParcela + (it.valorPago || 0);
                 const totalItem = valorParcela * parcelasTotal;
                 const abertoItem = Math.max(0, totalItem - pagoAcumulado);
-                const itemPago = abertoItem === 0;
+                const paidThisMonth = (it.valorPago || 0) >= valorParcela && valorParcela > 0;
+                const itemFinalizado = parcelaAtual >= parcelasTotal && paidThisMonth;
                 return `
-                  <tr data-item="${it.id}" class="${itemPago ? "row-paid" : ""}">
+                  <tr data-item="${it.id}" class="${paidThisMonth ? "row-paid" : ""}">
                     <td data-label="Item">${escapeHtml(it.descricao || "Item")}</td>
                     <td data-label="Parcela">${it.fixa ? `<span class="pill fixa" title="Conta fixa mensal">Mensal</span>` : `<span class="pill">${parcelaAtual}/${parcelasTotal}</span>`}</td>
                     <td class="num" data-label="Valor">${brl(valorParcela)}</td>
@@ -701,15 +744,15 @@ function renderContas(c) {
                       ${parcelasTotal > 1 ? `<div class="num-sub muted">de ${brl(totalItem)}</div>` : ""}
                     </td>
                     <td class="actions">
-                      ${itemPago ? `
-                        <button class="btn sm ghost" data-act="reabrir-item">Reabrir</button>
+                      ${paidThisMonth ? `
+                        <button class="btn sm ghost" data-act="reabrir-item" title="Desfaz o pagamento deste mês">Reabrir</button>
                       ` : it.fixa ? `
-                        <button class="btn sm success" data-act="pagar-todas">Pagar</button>
+                        <button class="btn sm success" data-act="pagar-parcela">Pagar</button>
                         <button class="btn sm ghost" data-act="parc-item">Parcial</button>
                       ` : `
-                        <button class="btn sm success" data-act="pagar-parcela">Pagar parcela</button>
+                        <button class="btn sm success" data-act="pagar-parcela" title="Marca a parcela ${parcelaAtual} como paga">Pagar parcela</button>
                         <button class="btn sm ghost" data-act="parc-item">Parcial</button>
-                        <button class="btn sm success" data-act="pagar-todas">Pagar todas</button>
+                        ${parcelaAtual < parcelasTotal ? `<button class="btn sm success" data-act="pagar-todas" title="Quita todas as parcelas restantes">Pagar todas</button>` : ""}
                       `}
                       <button class="btn sm ghost" data-act="edit-item">Editar</button>
                       <button class="btn sm danger" data-act="rm-item">×</button>
@@ -980,44 +1023,40 @@ function bindContas() {
           const act = btn.getAttribute("data-act");
 
           if (act === "pagar-parcela") {
-            // Pago essa parcela inteira → avança pra próxima (ou quita se for a última)
+            // Marca a parcela atual como paga deste mês — não avança.
+            // O auto-reopen abre a próxima no dia 1 do mês seguinte.
+            item.valorPago = item.valorParcela;
             const atual = item.parcelaAtual || 1;
             const total = item.parcelasTotal || 1;
-            if (atual >= total) {
-              item.valorPago = item.valorParcela;
+            if (item.fixa) {
+              toast("Pago este mês");
+            } else if (atual >= total) {
               toast("Última parcela paga · item quitado");
             } else {
-              item.parcelaAtual = atual + 1;
-              item.valorPago = 0;
-              toast(`Parcela ${atual} paga · agora ${item.parcelaAtual}/${total}`);
+              toast(`Parcela ${atual}/${total} paga este mês · próxima abre no dia 1`);
             }
 
           } else if (act === "pagar-todas") {
+            // Quita todas: pula pra última parcela e marca paga
             item.parcelaAtual = item.parcelasTotal || 1;
             item.valorPago = item.valorParcela;
-            toast(item.fixa ? "Item pago" : "Todas as parcelas pagas");
+            toast(item.fixa ? "Item pago" : "Todas as parcelas marcadas como pagas");
 
           } else if (act === "reabrir-item") {
+            // Desfaz o pagamento deste mês na parcela atual
             item.valorPago = 0;
-            toast("Item reaberto");
+            toast("Pagamento deste mês desfeito");
 
           } else if (act === "parc-item") {
             const aberto = Math.max(0, (item.valorParcela || 0) - (item.valorPago || 0));
             const v = await openDialog({
               title: "Pagamento parcial",
-              message: `${item.descricao} — em aberto nesta parcela: ${brl(aberto)}`,
+              message: `${item.descricao} — falta nesta parcela: ${brl(aberto)}`,
               confirmText: "Confirmar pagamento"
             });
             if (v == null || v <= 0) return;
             item.valorPago = Math.min(item.valorParcela, (item.valorPago || 0) + v);
-            // Se completou a parcela e não é a última, avança
-            if (!item.fixa && item.valorPago >= item.valorParcela && (item.parcelaAtual || 1) < (item.parcelasTotal || 1)) {
-              item.parcelaAtual = (item.parcelaAtual || 1) + 1;
-              item.valorPago = 0;
-              toast("Parcial completou a parcela · avançou pra próxima");
-            } else {
-              toast("Pagamento parcial registrado");
-            }
+            toast("Pagamento parcial registrado");
 
           } else if (act === "edit-item") {
             showFormItem(contaId, item);
@@ -1094,23 +1133,22 @@ function renderCaixa(c) {
 
       <div class="table-wrap stacked-rows" style="margin-top:10px;">
         <table>
-          <thead><tr><th>Local</th><th>Cor</th><th>Saldo calculado</th><th>Base</th><th></th></tr></thead>
+          <thead><tr><th>Local</th><th>Cor</th><th>Saldo calculado</th><th></th></tr></thead>
           <tbody>
             ${linhas.map((x) => `
               <tr data-id="${x.id}">
                 <td data-label="Local"><input class="inline-input" data-field="local" value="${escapeAttr(x.local)}" /></td>
                 <td data-label="Cor"><input type="color" class="inline-input cor-swatch" data-field="cor" value="${x.cor || "#2f7d32"}" /></td>
                 <td class="num" data-label="Saldo"><strong style="color:${x.cor || "#2f7d32"};">${brl(x.saldoCalc)}</strong></td>
-                <td data-label="Base"><input class="inline-input" data-field="valor" type="number" step="0.01" value="${x.base}" title="Valor base — saldo final = base + entradas − gastos" /></td>
                 <td class="actions">
-                  <button class="btn sm ghost" data-action="ajustar" title="Definir saldo final">Ajustar</button>
+                  <button class="btn sm ghost" data-action="ajustar" title="Definir saldo manualmente">Ajustar</button>
                   <button class="btn sm danger" data-action="remover">×</button>
                 </td>
               </tr>`).join("")}
           </tbody>
         </table>
       </div>
-      <p class="hint">Lance entradas/gastos pelo formulário no Resumo — o saldo daqui atualiza automaticamente.</p>
+      <p class="hint">O saldo aqui é <strong>calculado automaticamente</strong> a partir das entradas e gastos lançados. Use <strong>Ajustar</strong> só pra acertar com o saldo real (ex: depois de uma transferência não registrada).</p>
     </section>
 
     ${renderAReceber()}
@@ -1171,11 +1209,17 @@ function renderCaixa(c) {
         saveState(); renderAll();
       });
     });
-    tr.querySelector("[data-action=ajustar]")?.addEventListener("click", () => {
+    tr.querySelector("[data-action=ajustar]")?.addEventListener("click", async () => {
       const item = state.caixa.find((x) => x.id === id);
       if (!item) return;
-      const v = Number(prompt(`Saldo atual desejado em "${item.local}":`, caixaSaldoCalculado(item).toFixed(2)));
-      if (!Number.isFinite(v)) return;
+      const atual = caixaSaldoCalculado(item);
+      const v = await openDialog({
+        title: `Ajustar saldo`,
+        message: `${item.local} — saldo atual: ${brl(atual)}`,
+        defaultValue: atual,
+        confirmText: "Salvar"
+      });
+      if (v == null) return;
       const ajuste = sum(state.movimentacoes
         .filter((m) => m.fonteId === item.id)
         .map((m) => m.tipo === "Entrada" ? (m.valor || 0) : -(m.valor || 0)));
@@ -1339,15 +1383,24 @@ function bindAReceber() {
     const id = tr.getAttribute("data-receber");
     const r = state.aReceber.find((x) => x.id === id);
     if (!r) return;
-    tr.querySelector("[data-act=receber]").addEventListener("click", () => {
+    tr.querySelector("[data-act=receber]").addEventListener("click", async () => {
       if ((r.parcelasRecebidas || 0) >= r.parcelasTotal) { toast("Já recebeu todas"); return; }
-      r.parcelasRecebidas = (r.parcelasRecebidas || 0) + 1;
+      const proximaParcela = (r.parcelasRecebidas || 0) + 1;
+      const data = await openDialog({
+        title: "Recebi parcela",
+        message: `${r.descricao} — parcela ${proximaParcela}/${r.parcelasTotal} de ${brl(r.valorParcela)}. Quando você recebeu?`,
+        inputType: "date",
+        defaultValue: todayISO(),
+        confirmText: "Confirmar recebimento"
+      });
+      if (!data) return;
+      r.parcelasRecebidas = proximaParcela;
       // Lança movimentação de entrada na fonte automaticamente
       state.movimentacoes.unshift({
         id: uid(),
         tipo: "Entrada",
         categoria: "",
-        data: todayISO(),
+        data,
         descricao: `${r.descricao} (parc. ${r.parcelasRecebidas}/${r.parcelasTotal})`,
         valor: r.valorParcela,
         fonteId: r.fonteId
@@ -2443,7 +2496,7 @@ function renderAll() {
 
 /* ---------- DIALOG (substitui prompt/confirm) ---------- */
 
-function openDialog({ title, message, defaultValue = "", confirmText = "Confirmar", showInput = true }) {
+function openDialog({ title, message, defaultValue = "", confirmText = "Confirmar", inputType = "money", label = "" }) {
   return new Promise((resolve) => {
     const dlg = document.getElementById("dialog");
     if (!dlg) { resolve(null); return; }
@@ -2454,17 +2507,32 @@ function openDialog({ title, message, defaultValue = "", confirmText = "Confirma
 
     const wrap = dlg.querySelector("#dialog-input-wrap");
     const input = dlg.querySelector("#dialog-input");
-    wrap.style.display = showInput ? "" : "none";
+    wrap.style.display = inputType === "none" ? "none" : "";
 
-    if (showInput) {
-      // defaultValue pode vir como número (cents → "X,XX") ou string já formatada
+    // Reseta atributos pra reuso entre tipos
+    input.removeAttribute("data-currency");
+    input.removeAttribute("inputmode");
+    input.removeAttribute("min");
+    input.removeAttribute("max");
+    input.removeAttribute("step");
+
+    if (inputType === "money") {
+      input.type = "text";
+      input.inputMode = "decimal";
+      input.dataset.currency = "on";
+      input.placeholder = "0,00";
       let initial = "";
-      if (typeof defaultValue === "number" && defaultValue > 0) {
-        initial = fmtMoneyBR(defaultValue);
-      } else if (typeof defaultValue === "string" && defaultValue) {
-        initial = defaultValue;
-      }
+      if (typeof defaultValue === "number" && defaultValue > 0) initial = fmtMoneyBR(defaultValue);
+      else if (typeof defaultValue === "string" && defaultValue) initial = defaultValue;
       input.value = initial;
+    } else if (inputType === "date") {
+      input.type = "date";
+      input.placeholder = "";
+      input.value = defaultValue || todayISO();
+    } else if (inputType === "text") {
+      input.type = "text";
+      input.placeholder = label || "";
+      input.value = defaultValue || "";
     }
 
     const cancelBtns = dlg.querySelectorAll("[data-dialog-cancel]");
@@ -2480,9 +2548,13 @@ function openDialog({ title, message, defaultValue = "", confirmText = "Confirma
     const onCancel = () => { cleanup(); resolve(null); };
     const onConfirm = () => {
       const raw = input.value;
-      const num = showInput ? parseMoney(raw) : null;
+      let result;
+      if (inputType === "money") result = parseMoney(raw);
+      else if (inputType === "date") result = raw || null;
+      else if (inputType === "text") result = raw.trim();
+      else result = true;
       cleanup();
-      resolve(showInput ? num : true);
+      resolve(result);
     };
     const onKey = (e) => {
       if (e.key === "Enter") { e.preventDefault(); onConfirm(); }
@@ -2495,7 +2567,7 @@ function openDialog({ title, message, defaultValue = "", confirmText = "Confirma
     document.addEventListener("keydown", onEsc);
 
     dlg.classList.add("open");
-    if (showInput) requestAnimationFrame(() => { input.focus(); input.select(); });
+    if (inputType !== "none") requestAnimationFrame(() => { input.focus(); input.select?.(); });
   });
 }
 
@@ -2620,8 +2692,12 @@ function setupThemeToggle() {
 }
 
 loadState();
+const reabertas = autoReopenMonthly();
 renderAll();
 setupTabs();
 setupThemeToggle();
 setupQuickFab();
 setupCurrencyInputs();
+if (reabertas > 0) {
+  setTimeout(() => toast(`${reabertas} parcela(s) abertas pra este mês`), 400);
+}
