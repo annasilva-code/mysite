@@ -224,9 +224,10 @@ function cotaDiariaInfo(c) {
   const cotaBase = c.limiteMensal / diasNoMes;
 
   const isCatExcluida = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
+  const isTransfer = (m) => m.origem === "transfer" || m.origem === "transfer-taxa";
   const noMes = (m) => {
     const d = parseISO(m.data);
-    return m.tipo === "Gasto" && !isCatExcluida(m.categoria) && d.getMonth() === mes && d.getFullYear() === ano;
+    return m.tipo === "Gasto" && !isCatExcluida(m.categoria) && !isTransfer(m) && d.getMonth() === mes && d.getFullYear() === ano;
   };
   const hoje = state.referencia;
   const gastoHoje = sum(state.movimentacoes.filter((m) => noMes(m) && m.data === hoje).map((m) => m.valor));
@@ -936,9 +937,15 @@ function renderContas(c) {
     const aberto = valorAbertoConta(conta);
     const total = valorTotalConta(conta);
     const pago = total - aberto;
-    const quitada = conta.status === "pago" || aberto === 0;
     const pct = total > 0 ? (pago / total) * 100 : 0;
     const itens = (conta.itens || []);
+    // "Quitada de verdade" = TODOS os itens com todas as parcelas pagas até o fim
+    const trulyDone = itens.length > 0 && itens.every((it) =>
+      (it.parcelaAtual || 1) >= (it.parcelasTotal || 1) && (it.valorPago || 0) >= (it.valorParcela || 0)
+    );
+    // "Pago este mês" = só esse ciclo (ainda restam parcelas futuras)
+    const pagoEsteMes = aberto === 0 && !trulyDone;
+    const quitada = trulyDone;
     const statusV = statusVencimentoConta(conta);
     return `
       <details class="conta-card" data-conta="${conta.id}" style="--conta-cor:${conta.cor || "#2f7d32"};">
@@ -947,12 +954,18 @@ function renderContas(c) {
             <span class="conta-dot"></span>
             <strong>${escapeHtml(conta.descricao)}</strong>
             <span class="badge ${conta.grupo === "tia" ? "tia" : "outras"}">${conta.grupo === "tia" ? "Tia" : "Outras"}</span>
-            ${quitada ? `<span class="badge pago">Quitada</span>` : pago > 0 ? `<span class="badge parcial">Parcial</span>` : `<span class="badge pendente">Pendente</span>`}
+            ${quitada
+              ? `<span class="badge pago">Quitada</span>`
+              : pagoEsteMes
+                ? `<span class="badge parcial">Pago este mês</span>`
+                : pago > 0
+                  ? `<span class="badge parcial">Parcial</span>`
+                  : `<span class="badge pendente">Pendente</span>`}
           </div>
           <div class="conta-meta">
             <span class="badge ${statusV.level}">${statusV.text}</span>
             <span class="pill">total ${brl(total)}</span>
-            <span class="pill ${aberto > 0 ? "faltam" : "quitada"}">${aberto > 0 ? `falta ${brl(aberto)}` : "quitada"}</span>
+            <span class="pill ${aberto > 0 ? "faltam" : "quitada"}">${aberto > 0 ? `falta ${brl(aberto)}` : (trulyDone ? "quitada" : "pago no mês")}</span>
           </div>
           <span class="conta-toggle-arrow" aria-hidden="true">▾</span>
         </summary>
