@@ -558,7 +558,8 @@ function caixaBreakdown(fonte) {
 }
 
 function valorAbertoConta(c) {
-  if (c.status === "pago") return 0;
+  // Sempre recalcula a partir dos itens — não confia no campo status
+  // (status pode estar desatualizado se alterou um item depois de marcar pago)
   return sum((c.itens || []).map((i) => Math.max(0, (i.valorParcela || 0) - (i.valorPago || 0))));
 }
 function valorTotalConta(c) {
