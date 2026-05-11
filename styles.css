@@ -762,11 +762,15 @@ tbody tr:hover:not(.section) {
 }
 
 /* ===========================================
-   CONTAS GRID — cards com risco lateral fino
+   CONTAS GRID — tiles colapsáveis (details/summary)
    =========================================== */
 .contas-grid {
-  display: grid; grid-template-columns: 1fr;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 10px; margin-bottom: 14px;
+}
+@media (max-width: 720px) {
+  .contas-grid { grid-template-columns: 1fr; }
 }
 
 .conta-card {
@@ -774,16 +778,51 @@ tbody tr:hover:not(.section) {
   border: 1px solid var(--border);
   border-left: 3px solid var(--conta-cor, var(--accent));
   border-radius: var(--r-md);
-  padding: 16px 18px;
+  padding: 0;
   box-shadow: var(--shadow-sm);
   transition: border-color 0.15s ease;
+  overflow: hidden;
 }
 .conta-card:hover { border-color: var(--border-strong); border-left-color: var(--conta-cor, var(--accent)); }
+/* Quando expandido, ocupa a linha inteira */
+.conta-card[open] {
+  grid-column: 1 / -1;
+}
+
+/* Remove a setinha nativa do details */
+.conta-card > summary { list-style: none; }
+.conta-card > summary::-webkit-details-marker { display: none; }
+.conta-card > summary::marker { display: none; }
 
 .conta-head {
   display: flex; justify-content: space-between; align-items: center;
-  gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+  gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
 }
+.conta-head:hover { background: var(--surface-2); }
+
+.conta-toggle-arrow {
+  position: absolute;
+  right: 14px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+.conta-card[open] .conta-toggle-arrow {
+  transform: translateY(-50%) rotate(-180deg);
+}
+
+/* Body só aparece quando details está open */
+.conta-card > .progress,
+.conta-card > .conta-itens,
+.conta-card > .conta-foot { padding-left: 16px; padding-right: 16px; }
+.conta-card > .conta-itens { padding-top: 10px; padding-bottom: 4px; }
+.conta-card > .conta-foot { padding-bottom: 14px; padding-top: 10px; }
 .conta-title {
   display: flex; align-items: center; gap: 8px;
   flex-wrap: wrap; font-size: 1rem;

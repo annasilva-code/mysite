@@ -568,8 +568,9 @@ function compute() {
   const caixaTotal = sum(state.caixa.map((x) => caixaSaldoCalculado(x)));
   const movPeriodo = state.movimentacoes.filter((m) => inSelectedPeriod(m.data));
 
-  const entradas = sum(movPeriodo.filter((m) => m.tipo === "Entrada").map((m) => m.valor));
-  const gastos = sum(movPeriodo.filter((m) => m.tipo === "Gasto").map((m) => m.valor));
+  const _notTransfer = (m) => m.origem !== "transfer" && m.origem !== "transfer-taxa";
+  const entradas = sum(movPeriodo.filter((m) => m.tipo === "Entrada" && _notTransfer(m)).map((m) => m.valor));
+  const gastos = sum(movPeriodo.filter((m) => m.tipo === "Gasto" && _notTransfer(m)).map((m) => m.valor));
   const caixaAtual = caixaTotal;
 
   const contasPendentes = state.contas.filter((c) => c.status !== "pago");
@@ -580,7 +581,7 @@ function compute() {
 
   const gastoPorCategoria = {};
   state.categorias.forEach((c) => { gastoPorCategoria[c.nome] = 0; });
-  movPeriodo.filter((m) => m.tipo === "Gasto").forEach((m) => {
+  movPeriodo.filter((m) => m.tipo === "Gasto" && m.origem !== "transfer" && m.origem !== "transfer-taxa").forEach((m) => {
     if (gastoPorCategoria[m.categoria] === undefined) gastoPorCategoria[m.categoria] = 0;
     gastoPorCategoria[m.categoria] += m.valor;
   });
@@ -597,7 +598,8 @@ function compute() {
     const r = parseISO(state.referencia);
     return d.getMonth() === r.getMonth() && d.getFullYear() === r.getFullYear();
   });
-  const gastoLimite = sum(movMes.filter((m) => m.tipo === "Gasto" && !isCatExcluida(m.categoria)).map((m) => m.valor));
+  const isTransfer = (m) => m.origem === "transfer" || m.origem === "transfer-taxa";
+  const gastoLimite = sum(movMes.filter((m) => m.tipo === "Gasto" && !isCatExcluida(m.categoria) && !isTransfer(m)).map((m) => m.valor));
   const podeGastarMes = limiteMensal - gastoLimite;
 
   const fech = diasAteFechamento();
@@ -937,9 +939,10 @@ function renderContas(c) {
     const quitada = conta.status === "pago" || aberto === 0;
     const pct = total > 0 ? (pago / total) * 100 : 0;
     const itens = (conta.itens || []);
+    const statusV = statusVencimentoConta(conta);
     return `
-      <article class="conta-card" data-conta="${conta.id}" style="--conta-cor:${conta.cor || "#2f7d32"};">
-        <header class="conta-head">
+      <details class="conta-card" data-conta="${conta.id}" style="--conta-cor:${conta.cor || "#2f7d32"};">
+        <summary class="conta-head">
           <div class="conta-title">
             <span class="conta-dot"></span>
             <strong>${escapeHtml(conta.descricao)}</strong>
@@ -947,11 +950,12 @@ function renderContas(c) {
             ${quitada ? `<span class="badge pago">Quitada</span>` : pago > 0 ? `<span class="badge parcial">Parcial</span>` : `<span class="badge pendente">Pendente</span>`}
           </div>
           <div class="conta-meta">
-            ${(() => { const s = statusVencimentoConta(conta); return `<span class="badge ${s.level}">${s.text}</span>`; })()}
+            <span class="badge ${statusV.level}">${statusV.text}</span>
             <span class="pill">total ${brl(total)}</span>
             <span class="pill ${aberto > 0 ? "faltam" : "quitada"}">${aberto > 0 ? `falta ${brl(aberto)}` : "quitada"}</span>
           </div>
-        </header>
+          <span class="conta-toggle-arrow" aria-hidden="true">▾</span>
+        </summary>
 
         <div class="progress" style="height:8px;"><div class="fill" style="width:${pct}%; background: var(--conta-cor);"></div></div>
 
@@ -1014,7 +1018,7 @@ function renderContas(c) {
           <button class="btn sm ghost" data-act="edit-conta">Editar conta</button>
           <button class="btn sm danger" data-act="rm-conta">Remover</button>
         </footer>
-      </article>
+      </details>
     `;
   };
 
@@ -1375,7 +1379,8 @@ function bindContas() {
 
 function renderCaixa(c) {
   const el = document.getElementById("caixa");
-  const movEntradas = state.movimentacoes.filter((m) => m.tipo === "Entrada").slice(0, 30);
+  const movEntradas = state.movimentacoes.filter((m) => m.tipo === "Entrada" && m.origem !== "transfer").slice(0, 30);
+  const movTransfer = state.movimentacoes.filter((m) => m.origem === "transfer" || m.origem === "transfer-taxa").slice(0, 30);
 
   // Saldos calculados por fonte
   const linhas = state.caixa.map((x) => ({
@@ -1453,6 +1458,36 @@ function renderCaixa(c) {
     </section>
 
     ${renderAReceber()}
+
+    ${movTransfer.length > 0 ? `
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Transferências</h2>
+        <p class="panel-sub">Movimentações entre fontes — não contam como despesa ou entrada nova</p>
+      </div>
+      <div class="table-wrap stacked-rows">
+        <table>
+          <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Fonte</th><th>Valor</th><th></th></tr></thead>
+          <tbody>
+            ${movTransfer.map((m) => {
+              const sinal = m.tipo === "Entrada" ? "+" : "−";
+              const cls = m.tipo === "Entrada" ? "ok" : "neg";
+              const isTaxa = m.origem === "transfer-taxa";
+              return `
+                <tr data-mov="${m.id}">
+                  <td data-label="Data">${fmtBR(m.data)}</td>
+                  <td data-label="Tipo"><span class="pill ${isTaxa ? "faltam" : ""}">${isTaxa ? "Taxa" : (m.tipo === "Entrada" ? "↘ chegou" : "↗ saiu")}</span></td>
+                  <td data-label="Descrição">${escapeHtml(m.descricao)}</td>
+                  <td data-label="Fonte"><span class="pill" style="background:${fonteCor(m.fonteId)};color:#fff;">${escapeHtml(fonteNome(m.fonteId))}</span></td>
+                  <td class="num ${cls}" data-label="Valor">${sinal}${brl(m.valor)}</td>
+                  <td class="actions"><button class="btn sm danger" data-action="rm-mov">×</button></td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    ` : ""}
 
     <section class="panel">
       <div class="panel-head">
@@ -1741,7 +1776,8 @@ function bindAReceber() {
 function renderGastos(c) {
   const el = document.getElementById("gastos");
   const isCatExcluida = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
-  const todosGastos = state.movimentacoes.filter((m) => m.tipo === "Gasto").sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+  const isTransfer = (m) => m.origem === "transfer" || m.origem === "transfer-taxa";
+  const todosGastos = state.movimentacoes.filter((m) => m.tipo === "Gasto" && !isTransfer(m)).sort((a, b) => (b.data || "").localeCompare(a.data || ""));
   const cota = cotaDiariaInfo(c);
 
   // Dados pra gráfico no topo
@@ -1749,7 +1785,7 @@ function renderGastos(c) {
   const isCatComb = (nome) => state.categorias.some((cat) => cat.nome === nome && cat.excluirDoLimite);
   const gastosMes = state.movimentacoes.filter((m) => {
     const d = parseISO(m.data);
-    return m.tipo === "Gasto" && !isCatComb(m.categoria) && d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
+    return m.tipo === "Gasto" && !isCatComb(m.categoria) && !isTransfer(m) && d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
   });
   const porCat = {};
   gastosMes.forEach((m) => { porCat[m.categoria || "Sem categoria"] = (porCat[m.categoria || "Sem categoria"] || 0) + m.valor; });
